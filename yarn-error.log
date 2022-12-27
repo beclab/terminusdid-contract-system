@@ -1,0 +1,128 @@
+Arguments: 
+  /usr/local/bin/node /usr/local/bin/yarn
+
+PATH: 
+  /opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
+Yarn version: 
+  1.22.19
+
+Node version: 
+  16.13.1
+
+Platform: 
+  darwin arm64
+
+Trace: 
+  Error: read ETIMEDOUT
+      at TLSWrap.onStreamRead (node:internal/stream_base_commons:220:20)
+
+npm manifest: 
+  {
+    "devDependencies": {
+      "@nomiclabs/hardhat-ethers": "npm:hardhat-deploy-ethers@^0.3.0-beta.13",
+      "@nomiclabs/hardhat-etherscan": "^2.1.8",
+      "@nomiclabs/hardhat-ganache": "^2.0.1",
+      "@nomiclabs/hardhat-waffle": "^2.0.0",
+      "@types/chai": "^4.2.18",
+      "@types/mocha": "^8.2.2",
+      "@types/node": "^15.3.0",
+      "@typescript-eslint/eslint-plugin": "^5.5.0",
+      "@typescript-eslint/parser": "^5.5.0",
+      "chai": "^4.3.4",
+      "eslint": "^8.3.0",
+      "eslint-config-prettier": "^8.3.0",
+      "eslint-plugin-prettier": "^3.4.0",
+      "ethereum-waffle": "^3.0.0",
+      "ethers": "5.4.0",
+      "hardhat": "^2.6.0",
+      "hardhat-contract-sizer": "^2.0.3",
+      "hardhat-deploy": "^0.8.11",
+      "hardhat-gas-reporter": "^1.0.7",
+      "hardhat-log-remover": "^2.0.2",
+      "husky": "^6.0.0",
+      "lint-staged": "^11.0.0",
+      "prettier": "^2.2.1",
+      "prettier-plugin-solidity": "1.0.0-beta.10",
+      "solhint": "3.3.4",
+      "solhint-plugin-prettier": "^0.0.5",
+      "solidity-coverage": "^0.7.16",
+      "ts-mocha": "^8.0.0",
+      "ts-node": "^9.1.1",
+      "typescript": "^4.2.4"
+    },
+    "resolutions": {
+      "elliptic": "^6.5.3",
+      "lodash": "^4.17.20",
+      "underscore": "^1.9.0"
+    },
+    "scripts": {
+      "test": "yarn test:eth && yarn test:avax && yarn test:oracles && yarn test:utils",
+      "test:eth": "CHAINID=1 npx hardhat test test/*.ts test/libraries/*.ts",
+      "test:avax": "CHAINID=43114 npx hardhat test test/RibbonThetaVault.ts",
+      "test:sanity": "CHAINID=43114 npx hardhat test test/VaultSanityCheck.ts",
+      "test:oracles": "npx hardhat test test/oracles/*.ts",
+      "test:upgrade": "npx hardhat test test/upgrades/*.ts",
+      "test:integration": "npx hardhat test test/integration/*.ts",
+      "test:utils": "npx hardhat test test/utils/*.ts",
+      "compile": "CHAINID=97 npx hardhat compile",
+      "deploy": "npx hardhat deploy",
+      "etherscan-verify": "npx hardhat etherscan-verify",
+      "export-deployments": "npx hardhat export-deployments",
+      "prepare": "cd .. && husky install cvol/.husky",
+      "prettier:sol": "yarn prettier --write contracts/*",
+      "lint:ts": "eslint '**/*.ts'",
+      "lint:ts:fix": "yarn lint:ts --fix",
+      "lint:ts:prettier": "prettier --write '**/*.ts'",
+      "lint:sol": "solhint -f table contracts/**/*.sol",
+      "lint:sol:prettier": "prettier --write \"contracts/**/*.sol\"",
+      "clean-logs": "yarn run hardhat remove-logs",
+      "coverage": "yarn run hardhat coverage"
+    },
+    "husky": {
+      "hooks": {
+        "pre-commit": "lint-staged"
+      }
+    },
+    "lint-staged": {
+      "contracts/**/*.sol": [
+        "yarn prettier:contracts",
+        "yarn lint:sol",
+        "yarn lint:sol:prettier"
+      ],
+      "test/**": [
+        "yarn lint:test:fix",
+        "yarn lint:test:prettier"
+      ],
+      "scripts/**": [
+        "yarn lint:ts:fix",
+        "yarn lint:ts:prettier"
+      ]
+    },
+    "license": "MIT",
+    "dependencies": {
+      "@airswap/utils": "^0.4.4",
+      "@chainlink/contracts": "^0.4.0",
+      "@openzeppelin/contracts": "4.3.1",
+      "@openzeppelin/contracts-upgradeable": "4.3.1",
+      "@ribbon-finance/rvol": "^1.4.2",
+      "axios": "^0.21.1",
+      "cron": "^1.8.2",
+      "discord.js": "^12.5.3",
+      "dotenv": "^10.0.0",
+      "got": "^10.7.0",
+      "json-stable-stringify": "^1.0.1",
+      "moment-timezone": "^0.5.33",
+      "simple-git": "^2.45.1",
+      "web3": "^1.7.3"
+    },
+    "mocha": {
+      "timeout": 20000
+    }
+  }
+
+yarn manifest: 
+  No manifest
+
+Lockfile: 
+  No lockfile
