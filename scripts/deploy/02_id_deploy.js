@@ -14,21 +14,19 @@ async function main(deployments) {
     console.log("Deploying contracts with the account:", deployer.address);
     console.log("Account balance:", (await deployer.getBalance()).toString());
 
+    const myMinimalForwarderAddr = deployments.MyMinimalForwarder;
+    if (!myMinimalForwarderAddr) {
+        return;
+    }
+
     const IdRegistry = await ethers.getContractFactory('IdRegistry');
     console.log("Deploying...")
-    const registry = await IdRegistry.deploy(deployer.address);
+    const registry = await IdRegistry.deploy(myMinimalForwarderAddr);
         
     console.log("IdRegistry address", registry.address)
     console.log("Waiting for deployed...")
     
     await sleep(1000*10);
-
-    await run("verify:verify", {
-        address: registry.address,
-        constructorArguments: [
-            deployer.address
-        ],
-    });
 
     deployments["IdRegistry"] = registry.address;
     await new Promise((resolve,reject) => {
@@ -39,6 +37,13 @@ async function main(deployments) {
             }
             return resolve();
         })
+    });
+
+    await run("verify:verify", {
+        address: registry.address,
+        constructorArguments: [
+            deployer.address
+        ],
     });
 }
 
