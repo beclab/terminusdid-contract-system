@@ -10,4 +10,4 @@ fi
 #npx hardhat run scripts/deploy/02_id_deploy.js --network goerli
 #npx hardhat run scripts/deploy/03_name_deploy.js --network goerli
 #npx hardhat run scripts/deploy/04_bundle_deploy.js --network goerli
-npx hardhat run scripts/deploy/05_bundle_register.js  --network goerli
+#npx hardhat run scripts/deploy/05_bundle_register.js  --network goerli

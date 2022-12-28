@@ -32,26 +32,26 @@ async function main(deployments) {
    const NameRegistry = new ethers.Contract(deployments.NameRegistry, NameRegistryArtifacts.abi, provider);
    
 
-//    await IdRegistry.connect(deployer).changeTrustedCaller(BundleRegistry.address, {
-//         gasPrice: ethers.utils.parseUnits("10", "gwei"),
-//         gasLimit: 1500000,
-//    });
-
-
-//    await NameRegistry.connect(deployer).grantRole(ADMIN_ROLE, deployer.address, {
-//         gasPrice: ethers.utils.parseUnits("10", "gwei"),
-//         gasLimit: 1500000,
-//    });
-
-        // await NameRegistry.connect(deployer).changeTrustedCaller(BundleRegistry.address, {
-        //     gasPrice: ethers.utils.parseUnits("10", "gwei"),
-        //     gasLimit: 1500000,
-        // });
-
-        await NameRegistry.connect(deployer).renounceRole(ADMIN_ROLE, deployer.address, {
+    await IdRegistry.connect(deployer).changeTrustedCaller(BundleRegistry.address, {
             gasPrice: ethers.utils.parseUnits("10", "gwei"),
             gasLimit: 1500000,
-        });
+    });
+
+
+    await NameRegistry.connect(deployer).grantRole(ADMIN_ROLE, deployer.address, {
+            gasPrice: ethers.utils.parseUnits("10", "gwei"),
+            gasLimit: 1500000,
+    });
+
+    await NameRegistry.connect(deployer).changeTrustedCaller(BundleRegistry.address, {
+        gasPrice: ethers.utils.parseUnits("10", "gwei"),
+        gasLimit: 1500000,
+    });
+
+    await NameRegistry.connect(deployer).renounceRole(ADMIN_ROLE, deployer.address, {
+        gasPrice: ethers.utils.parseUnits("10", "gwei"),
+        gasLimit: 1500000,
+    });
 }
 
 
