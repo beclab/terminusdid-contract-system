@@ -11,7 +11,7 @@ export const TEST_URI = {
   [CHAINID.BSC_TEST]: "https://data-seed-prebsc-1-s3.binance.org:8545",
 };
 
-export type Networks = "mainnet" | "kovan" | "bsc_test";
+export type Networks = "mainnet" | "kovan" | "bsc_test" | "goerli";
 
 export const getDefaultProvider = (network: Networks = "kovan") => {
   let url =
@@ -21,6 +21,10 @@ export const getDefaultProvider = (network: Networks = "kovan") => {
 
   if (network === "bsc_test") {
     url = "https://data-seed-prebsc-2-s1.binance.org:8545/";
+  }
+
+  if (network === "goerli") {
+    url = "https://rpc.ankr.com/eth_goerli";
   }
 
   const provider = new ethers.providers.JsonRpcProvider(url);

@@ -22,7 +22,7 @@ async function main(deployments) {
 
    const registry = await BundleRegistry.deploy(id_address, name_address, deployer.address);
        
-   await sleep(1000*10);
+   await sleep(1000*30);
    console.log("BundleRegistry address", registry.address)
    console.log("Waiting for deployed...")
 
@@ -35,7 +35,7 @@ async function main(deployments) {
         ],
     });
 
-    await sleep(1000*10);
+    await sleep(1000*50);
 
     deployments["BundleRegistry"] = registry.address;
     await new Promise((resolve,reject) => {

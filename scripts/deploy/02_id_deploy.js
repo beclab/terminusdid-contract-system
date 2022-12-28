@@ -26,7 +26,7 @@ async function main(deployments) {
     console.log("IdRegistry address", registry.address)
     console.log("Waiting for deployed...")
     
-    await sleep(1000*10);
+    await sleep(1000*50);
 
     deployments["IdRegistry"] = registry.address;
     await new Promise((resolve,reject) => {
@@ -42,7 +42,7 @@ async function main(deployments) {
     await run("verify:verify", {
         address: registry.address,
         constructorArguments: [
-            deployer.address
+            myMinimalForwarderAddr
         ],
     });
 }

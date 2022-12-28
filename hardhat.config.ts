@@ -43,6 +43,12 @@ export default {
       chainId: 4,
       accounts: [ `0x${TEST_PRIVATEKEY}` ],
     },
+    goerli: {
+      url: `https://rpc.ankr.com/eth_goerli`,
+      chainId: 5,
+      accounts: [ `0x${TEST_PRIVATEKEY}` ],
+      gas: 10e6,
+    },
     bsc_mainnet: {
       url: `https://bsc-dataseed1.binance.org/`,
       chainId: 56,
@@ -75,7 +81,7 @@ export default {
   },
   etherscan: {
     apiKey: {
-      bscTestnet: 'N7IS8JC3BRGM2G667A2N3V5IZHH3XUKG84'
+      goerli: process.env.ETHERSCAN_GOERLI_API_KEY
     }
   },
   gasReporter: {

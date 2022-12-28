@@ -21,7 +21,7 @@ async function main(deployments) {
     console.log("MyMinimalForwarder address", myMinimalForwarder.address)
     console.log("Waiting for deployed...")
     
-    await sleep(1000*10);
+    await sleep(1000*50);
 
     deployments["MyMinimalForwarder"] = myMinimalForwarder.address;
     await new Promise((resolve,reject) => {

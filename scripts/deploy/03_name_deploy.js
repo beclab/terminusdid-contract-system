@@ -36,7 +36,7 @@ async function main(deployments) {
     console.log("Waiting for deployed...")
     await proxy.deployed();
 
-    await sleep(1000*10);
+    await sleep(1000*50);
 
     const implAddress = await upgrades.erc1967.getImplementationAddress(proxy.address)
     console.log("Implementation address", implAddress)
