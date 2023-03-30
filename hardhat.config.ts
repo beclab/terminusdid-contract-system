@@ -8,7 +8,7 @@ require("dotenv").config();
 
 const TEST_PRIVATEKEY = process.env.PRIVATE_KEY;
 const TEST_MNEMONIC =
-    "test test test test test test test test test test test junk";
+  "test test test test test test test test test test test junk";
 
 const CHAINID = process.env.CHAINID ? Number(process.env.CHAINID) : 97;
 
@@ -41,24 +41,30 @@ export default {
     rinkeby: {
       url: `https://rinkeby.infura.io/v3/`,
       chainId: 4,
-      accounts: [ `0x${TEST_PRIVATEKEY}` ],
+      accounts: [`0x${TEST_PRIVATEKEY}`],
     },
     goerli: {
       url: `https://rpc.ankr.com/eth_goerli`,
       chainId: 5,
-      accounts: [ `0x${TEST_PRIVATEKEY}` ],
+      accounts: [`0x${TEST_PRIVATEKEY}`],
       gas: 10e6,
     },
     bsc_mainnet: {
       url: `https://bsc-dataseed1.binance.org/`,
       chainId: 56,
-      accounts: [ `0x${TEST_PRIVATEKEY}` ],
+      accounts: [`0x${TEST_PRIVATEKEY}`],
       gas: 10e6,
     },
     bsc_testnet: {
       url: `https://data-seed-prebsc-1-s3.binance.org:8545/`,
       chainId: 97,
-      accounts: [ `0x${TEST_PRIVATEKEY}` ],
+      accounts: [`0x${TEST_PRIVATEKEY}`],
+      gas: 10e6,
+    },
+    cmt_new: {
+      url: `http://3.85.226.255`,
+      chainId: 20,
+      accounts: [`0x${TEST_PRIVATEKEY}`],
       gas: 10e6,
     }
   },

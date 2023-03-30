@@ -1,13 +1,13 @@
 var fs = require('fs');
-const {ethers} = require("hardhat");
+const { ethers } = require("hardhat");
 //const deployments = require("")
 //const file = await open('../../deployments/deployments');
 
-function sleep(ms) {
-    return new Promise((resolve) => {
-      setTimeout(resolve, ms);
-    });
-}
+// function sleep(ms) {
+//     return new Promise((resolve) => {
+//       setTimeout(resolve, ms);
+//     });
+// }
 
 async function main(deployments) {
     const [deployer] = await ethers.getSigners();
@@ -16,22 +16,21 @@ async function main(deployments) {
 
     const myMinimalForwarderAddr = deployments.MyMinimalForwarder;
     if (!myMinimalForwarderAddr) {
-        return;
+        return console.error(`MyMinimalForwarder has not deployed yet!\n`);
     }
 
     const IdRegistry = await ethers.getContractFactory('IdRegistry');
-    console.log("Deploying...")
+    console.log("Deploying...");
     const registry = await IdRegistry.deploy(myMinimalForwarderAddr);
-        
-    console.log("IdRegistry address", registry.address)
-    console.log("Waiting for deployed...")
-    
-    await sleep(1000*50);
+    console.log("Waiting for deployed...");
+    await registry.deployed();
+
+    console.log("IdRegistry address", registry.address);
 
     deployments["IdRegistry"] = registry.address;
-    await new Promise((resolve,reject) => {
-        fs.writeFile('./deployments/deployments.json',JSON.stringify(deployments), function(err){
-            if(err){
+    await new Promise((resolve, reject) => {
+        fs.writeFile('./deployments/deployments.json', JSON.stringify(deployments), function (err) {
+            if (err) {
                 console.log(err)
                 return resolve(err);
             }
@@ -39,35 +38,40 @@ async function main(deployments) {
         })
     });
 
-    await run("verify:verify", {
-        address: registry.address,
-        constructorArguments: [
-            myMinimalForwarderAddr
-        ],
-    });
+    try {
+        await run("verify:verify", {
+            address: registry.address,
+            constructorArguments: [
+                myMinimalForwarderAddr
+            ],
+        });
+    } catch (err) {
+        console.error(err);
+    }
 }
 
 
 async function start() {
-    const result = await new Promise((resolve,reject) => {
-        fs.readFile('./deployments/deployments.json',function(err,data){
-            if(err){
-                console.log(err)
+    console.log(`02: deploy IdResigtry ...\n`);
+    const result = await new Promise((resolve, reject) => {
+        fs.readFile('./deployments/deployments.json', function (err, data) {
+            if (err) {
+                console.log(err);
                 return resolve(null);
             }
             return resolve(data);
         })
     });
 
-    if( !result) {
-        return;
+    if (!result) {
+        return console.error(`./deployments/deployments.json has not initialized yet`);
     }
 
     let deployments = JSON.parse(result);
-    console.log(deployments)
+    console.log(deployments);
 
-    if( 'IdRegistry' in deployments ) {
-        return;
+    if ('IdRegistry' in deployments) {
+        return console.log(`IdResigtry has deployed!\n`);
     }
 
     main(deployments).catch((error) => {
