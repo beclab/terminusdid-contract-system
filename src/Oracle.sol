@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity 0.8.21;
 
-import "./OracleType.sol";
+import {OracleType} from "./OracleType.sol";
 import {Ownable} from "openzeppelin/access/Ownable.sol";
 
 contract Oracle is Ownable, OracleType {
@@ -12,7 +12,7 @@ contract Oracle is Ownable, OracleType {
     mapping(address => bool) private _resolvers;
 
     modifier onlyResolver() {
-        require(_resolvers[msg.sender], "not valid resolver");
+        require(_resolvers[msg.sender], "Oracle: not valid resolver");
         _;
     }
 
@@ -24,13 +24,21 @@ contract Oracle is Ownable, OracleType {
         _data[domainHash].metadata = metadata;
     }
 
-    function getExtentedAttr(bytes32 domainHash, bytes32 attrHash) public view onlyResolver returns (bytes memory) {
-        return _data[domainHash].extentedAttr[attrHash];
+    function getExtentedAttr(bytes32 domainHash, string calldata attrKey)
+        public
+        view
+        onlyResolver
+        returns (bytes memory)
+    {
+        return _data[domainHash].extentedAttr[attrKey];
     }
 
-    function setExtentedAttr(bytes32 domainHash, bytes32 attrHash, bytes calldata attrData) public onlyResolver {
+    function setExtentedAttr(bytes32 domainHash, string calldata attrKey, bytes calldata attrData)
+        public
+        onlyResolver
+    {
         DomainInfo storage domainInfo = _data[domainHash];
-        domainInfo.extentedAttr[attrHash] = attrData;
+        domainInfo.extentedAttr[attrKey] = attrData;
     }
 
     function addResolver(address resolver) public onlyOwner {

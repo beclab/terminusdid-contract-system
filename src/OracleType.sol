@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity 0.8.21;
 
 contract OracleType {
     enum InfoType {
@@ -9,6 +9,7 @@ contract OracleType {
     }
 
     struct Metadata {
+        string domain;
         string did;
         address owner;
         InfoType infoType;
@@ -16,6 +17,6 @@ contract OracleType {
 
     struct DomainInfo {
         Metadata metadata;
-        mapping(bytes32 => bytes) extentedAttr;
+        mapping(string => bytes) extentedAttr;
     }
 }
