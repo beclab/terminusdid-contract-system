@@ -1,17 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import "../Oracle.sol";
-import "../OracleType.sol";
+import {Oracle} from "../Oracle.sol";
+import {OracleType} from "../OracleType.sol";
+import {BaseResolver} from "./BaseResolver.sol";
 
-contract MetaResolver {
+abstract contract MetaResolver is BaseResolver {
     event SetMeta(bytes32 indexed node, string did, address owner, OracleType.InfoType InfoType);
-
-    Oracle public oracle;
-
-    constructor(address _oracle) {
-        oracle = Oracle(_oracle);
-    }
 
     function setMeta(bytes32 node, string calldata did, address owner, OracleType.InfoType infoType) external {
         oracle.setMetadata(node, OracleType.Metadata({did: did, owner: owner, infoType: infoType}));

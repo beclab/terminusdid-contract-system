@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "./OracleType.sol";
-import "openzeppelin/access/Ownable.sol";
+import {Ownable} from "openzeppelin/access/Ownable.sol";
 
 contract Oracle is Ownable, OracleType {
     event AddResolver(address indexed resolver);
