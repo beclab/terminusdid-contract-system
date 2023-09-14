@@ -4,16 +4,17 @@ pragma solidity 0.8.21;
 import {BaseResolver} from "./BaseResolver.sol";
 
 abstract contract RsaResolver is BaseResolver {
-    string constant KEY = "std:rsa";
+    string constant KEY = "std:rsaPubKey";
 
-    event RsaChanged(bytes32 indexed node, string key, bytes pubKey);
+    event RsaChanged(bytes32 indexed node, string key, string pubKey);
 
-    function setRsa(bytes32 node, bytes calldata pubKey) external {
-        oracle.setExtentedAttr(node, KEY, pubKey);
+    function setRsaPubKey(bytes32 node, string calldata pubKey) external {
+        oracle.setExtentedAttr(node, KEY, bytes(pubKey));
         emit RsaChanged(node, KEY, pubKey);
     }
 
-    function getRsa(bytes32 node) external view returns (bytes memory) {
-        return oracle.getExtentedAttr(node, KEY);
+    function getRsaPubKey(bytes32 node) external view returns (string memory) {
+        bytes memory pubKey = oracle.getExtentedAttr(node, KEY);
+        return string(pubKey);
     }
 }
