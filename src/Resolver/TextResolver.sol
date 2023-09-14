@@ -9,7 +9,7 @@ abstract contract TextResolver is BaseResolver {
 
     strings.slice CUSTOM = "custom:".toSlice();
 
-    event SetText(bytes32 indexed node, string key, string value);
+    event TextChanged(bytes32 indexed node, string indexed key, string value);
 
     modifier validKeyOnly(string calldata key) {
         strings.slice memory keySlice = key.toSlice();
@@ -19,6 +19,7 @@ abstract contract TextResolver is BaseResolver {
 
     function setText(bytes32 node, string calldata key, string calldata value) external validKeyOnly(key) {
         oracle.setExtentedAttr(node, key, bytes(value));
+        emit TextChanged(node, key, value);
     }
 
     function getText(bytes32 node, string calldata key) external view validKeyOnly(key) returns (string memory) {

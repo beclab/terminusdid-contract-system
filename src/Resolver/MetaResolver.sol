@@ -5,7 +5,7 @@ import {OracleType} from "../OracleType.sol";
 import {BaseResolver} from "./BaseResolver.sol";
 
 abstract contract MetaResolver is BaseResolver {
-    event SetMeta(string indexed domain, string indexed did, address indexed owner, OracleType.InfoType InfoType);
+    event MetaChanged(bytes32 indexed node, string indexed domain, string indexed did, address owner, OracleType.InfoType InfoType);
 
     function setMeta(
         bytes32 node,
@@ -16,7 +16,7 @@ abstract contract MetaResolver is BaseResolver {
     ) external {
         require(keccak256(bytes(domain)) == node, "MetaResolver: domain name and hash mismatch");
         oracle.setMetadata(node, OracleType.Metadata({domain: domain, did: did, owner: owner, infoType: infoType}));
-        emit SetMeta(domain, did, owner, infoType);
+        emit MetaChanged(node, domain, did, owner, infoType);
     }
 
     function getMeta(bytes32 node) external view returns (string memory, string memory, address, OracleType.InfoType) {
