@@ -9,52 +9,49 @@ describe('RsaResolver test', function () {
 
     async function deployTokenFixture() {
 
-        const Oracle = await getContractFactory('Oracle');
-        const oracle = await Oracle.deploy();
-        await oracle.deployed();
+        const RsaResolver = await getContractFactory('RsaResolver');
+        const rsaResolver = await RsaResolver.deploy();
+        await rsaResolver.deployed();
 
-        const PublicResolver = await getContractFactory('PublicResolver');
-        const publicResolver = await PublicResolver.deploy(oracle.address);
-        await publicResolver.deployed();
-
-        await oracle.addResolver(publicResolver.address);
-        return { publicResolver, oracle };
+        return { rsaResolver };
     }
 
     describe('Basis test', function () {
-        it('oracle check', async function () {
-            const { publicResolver, oracle } = await loadFixture(deployTokenFixture);
-            const oracleAddr = await publicResolver.oracle();
-            expect(oracleAddr).to.equal(oracle.address);
-        });
 
-        it('set/get rsa pub key', async function () {
-            const { publicResolver } = await loadFixture(deployTokenFixture);
+        it('is valid pub key in DER bytes', async function () {
+            const { rsaResolver } = await loadFixture(deployTokenFixture);
             const { publicKey, privateKey } = crypto.generateKeyPairSync("rsa", {
                 // The standard secure default length for RSA keys is 2048 bits
                 modulusLength: 2048,
-                publicKeyEncoding: {
-                    type: 'pkcs1',
-                    format: 'pem'
-                },
-                privateKeyEncoding: {
-                    type: 'pkcs1',
-                    format: 'pem'
-                },
-            })
-            const domain = "test.com";
-            const node = utils.keccak256(utils.toUtf8Bytes(domain));
-            await publicResolver.setRsaPubKey(node, publicKey);
+            });
 
-            const pubKeyFromChain = await publicResolver.getRsaPubKey(node);
-            expect(publicKey).to.equal(pubKeyFromChain);
+            const publicKeyInDER = publicKey.export({ type: 'pkcs1', format: 'der' });
+            // const publicKeyInDER1 = publicKey.export({ type: 'spki', format: 'der' });
+            // console.log(publicKeyInDER1.toString('hex'));
+            const publicKeyInPEM = publicKey.export({ type: 'pkcs1', format: 'pem' });
+            const publicKeyInJWK = publicKey.export({ format: 'jwk' });
+            console.log(publicKeyInDER.toString('hex'));
+            // console.log(publicKeyInPEM);
+            // console.log(publicKeyInJWK);
 
-            // encrypt with pubKeyFromChain and decrypt with privateKey
+            const n = Buffer.from(publicKeyInJWK.n, 'base64').toString('hex');
+            const e = Buffer.from(publicKeyInJWK.e, 'base64').toString('hex');
+            console.log(n);
+            console.log(e);
+
+
+            const privateKeyInDER = privateKey.export({ type: 'pkcs1', format: 'der' });
+            const privateKeyInPEM = privateKey.export({ type: 'pkcs1', format: 'pem' });
+            const privateKeyInJWK = privateKey.export({ format: 'jwk' });
+            // console.log(privateKeyInDER.toString('hex'));
+            // console.log(privateKeyInPEM);
+            // console.log(privateKeyInJWK);
+
             const dataToEncrypt = "hello did service";
 
             const encryptedData = crypto.publicEncrypt(
                 {
-                    key: pubKeyFromChain,
+                    key: publicKeyInPEM,
                     padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
                     oaepHash: 'sha256',
                 },
@@ -64,7 +61,7 @@ describe('RsaResolver test', function () {
 
             const decryptedData = crypto.privateDecrypt(
                 {
-                    key: privateKey,
+                    key: privateKeyInPEM,
                     // In order to decrypt the data, we need to specify the
                     // same hashing function and padding scheme that we used to
                     // encrypt the data in the previous step
@@ -73,7 +70,9 @@ describe('RsaResolver test', function () {
                 },
                 Buffer.from(encryptedData, 'base64'),
             )
-            expect(dataToEncrypt).to.equal(decryptedData.toString());
+            // console.log(dataToEncrypt);
+            // console.log(decryptedData.toString('utf8'));
+            expect(dataToEncrypt).to.equal(decryptedData.toString('utf8'));
         });
     })
 });

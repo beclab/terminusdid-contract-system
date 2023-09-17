@@ -1,1 +1,2 @@
 forge-std/=lib/forge-std/src/
+ens-contracts/=lib/ens-contracts/contracts/
