@@ -36,12 +36,25 @@ library Asn1Decode {
     using NodePtr for uint;
     using BytesUtils for bytes;
 
+    enum ErrorCode {
+        NoError,
+        NotTypeBitString,
+        BitStringNotPaddedWithZero,
+        NotTypeOctetString,
+        NotTypeSequenceString,
+        NotAConstructedType,
+        NotTypeInteger,
+        NotPositive,
+        EncodingTooLong,
+        WrongLength
+    }
+
     /*
      * @dev Get the root node. First step in traversing an ASN1 structure
      * @param der The DER-encoded ASN1 structure
      * @return A pointer to the outermost node
      */
-    function root(bytes memory der) internal pure returns (uint) {
+    function root(bytes memory der) internal pure returns (ErrorCode, uint) {
         return readNodeLength(der, 0);
     }
 
@@ -53,8 +66,10 @@ library Asn1Decode {
     function rootOfBitStringAt(
         bytes memory der,
         uint ptr
-    ) internal pure returns (uint) {
-        require(der[ptr.ixs()] == 0x03, "Not type BIT STRING");
+    ) internal pure returns (ErrorCode, uint) {
+        if (der[ptr.ixs()] != 0x03) {
+            return (ErrorCode.NotTypeBitString, 0);
+        }
         return readNodeLength(der, ptr.ixf() + 1);
     }
 
@@ -66,8 +81,10 @@ library Asn1Decode {
     function rootOfOctetStringAt(
         bytes memory der,
         uint ptr
-    ) internal pure returns (uint) {
-        require(der[ptr.ixs()] == 0x04, "Not type OCTET STRING");
+    ) internal pure returns (ErrorCode, uint) {
+        if (der[ptr.ixs()] != 0x04) {
+            return (ErrorCode.NotTypeOctetString, 0);
+        }
         return readNodeLength(der, ptr.ixf());
     }
 
@@ -79,8 +96,10 @@ library Asn1Decode {
     function rootOfSequenceStringAt(
         bytes memory der,
         uint ptr
-    ) internal pure returns (uint) {
-        require(der[ptr.ixs()] == 0x30, "Not type SEQUENCE STRING");
+    ) internal pure returns (ErrorCode, uint) {
+        if (der[ptr.ixs()] != 0x30) {
+            return (ErrorCode.NotTypeSequenceString, 0);
+        }
         return readNodeLength(der, ptr.ixf());
     }
 
@@ -93,7 +112,7 @@ library Asn1Decode {
     function nextSiblingOf(
         bytes memory der,
         uint ptr
-    ) internal pure returns (uint) {
+    ) internal pure returns (ErrorCode, uint) {
         return readNodeLength(der, ptr.ixl() + 1);
     }
 
@@ -106,8 +125,10 @@ library Asn1Decode {
     function firstChildOf(
         bytes memory der,
         uint ptr
-    ) internal pure returns (uint) {
-        require(der[ptr.ixs()] & 0x20 == 0x20, "Not a constructed type");
+    ) internal pure returns (ErrorCode, uint) {
+        if (der[ptr.ixs()] & 0x20 != 0x20) {
+            return (ErrorCode.NotAConstructedType, 0);
+        }
         return readNodeLength(der, ptr.ixf());
     }
 
@@ -167,11 +188,21 @@ library Asn1Decode {
      * @param ptr Points to the indices of the current node
      * @return Uint value of node
      */
-    function uintAt(bytes memory der, uint ptr) internal pure returns (uint) {
-        require(der[ptr.ixs()] == 0x02, "Not type INTEGER");
-        require(der[ptr.ixf()] & 0x80 == 0, "Not positive");
+    function uintAt(
+        bytes memory der,
+        uint ptr
+    ) internal pure returns (ErrorCode, uint) {
+        if (der[ptr.ixs()] != 0x02) {
+            return (ErrorCode.NotTypeInteger, 0);
+        }
+        if (der[ptr.ixf()] & 0x80 != 0) {
+            return (ErrorCode.NotPositive, 0);
+        }
         uint len = ptr.ixl() + 1 - ptr.ixf();
-        return uint(der.readBytesN(ptr.ixf(), len) >> ((32 - len) * 8));
+        return (
+            ErrorCode.NoError,
+            uint(der.readBytesN(ptr.ixf(), len) >> ((32 - len) * 8))
+        );
     }
 
     /*
@@ -183,13 +214,20 @@ library Asn1Decode {
     function uintBytesAt(
         bytes memory der,
         uint ptr
-    ) internal pure returns (bytes memory) {
-        require(der[ptr.ixs()] == 0x02, "Not type INTEGER");
-        require(der[ptr.ixf()] & 0x80 == 0, "Not positive");
+    ) internal pure returns (ErrorCode, bytes memory) {
+        if (der[ptr.ixs()] != 0x02) {
+            return (ErrorCode.NotTypeInteger, bytes(""));
+        }
+        if (der[ptr.ixf()] & 0x80 != 0) {
+            return (ErrorCode.NotPositive, bytes(""));
+        }
         uint valueLength = ptr.ixl() + 1 - ptr.ixf();
         if (der[ptr.ixf()] == 0)
-            return der.substring(ptr.ixf() + 1, valueLength - 1);
-        else return der.substring(ptr.ixf(), valueLength);
+            return (
+                ErrorCode.NoError,
+                der.substring(ptr.ixf() + 1, valueLength - 1)
+            );
+        else return (ErrorCode.NoError, der.substring(ptr.ixf(), valueLength));
     }
 
     function keccakOfBytesAt(
@@ -215,18 +253,26 @@ library Asn1Decode {
     function bitstringAt(
         bytes memory der,
         uint ptr
-    ) internal pure returns (bytes memory) {
+    ) internal pure returns (ErrorCode, bytes memory) {
         require(der[ptr.ixs()] == 0x03, "Not type BIT STRING");
+        if (der[ptr.ixs()] != 0x03) {
+            return (ErrorCode.NotTypeBitString, bytes(""));
+        }
         // Only 00 padded bitstr can be converted to bytestr!
-        require(der[ptr.ixf()] == 0x00);
+        if (der[ptr.ixf()] != 0x00) {
+            return (ErrorCode.BitStringNotPaddedWithZero, bytes(""));
+        }
         uint valueLength = ptr.ixl() + 1 - ptr.ixf();
-        return der.substring(ptr.ixf() + 1, valueLength - 1);
+        return (
+            ErrorCode.NoError,
+            der.substring(ptr.ixf() + 1, valueLength - 1)
+        );
     }
 
     function readNodeLength(
         bytes memory der,
         uint ix
-    ) private pure returns (uint) {
+    ) private pure returns (ErrorCode, uint) {
         uint length;
         uint80 ixFirstContentByte;
         uint80 ixLastContentByte;
@@ -236,7 +282,9 @@ library Asn1Decode {
             ixLastContentByte = uint80(ixFirstContentByte + length - 1);
         } else {
             uint8 lengthbytesLength = uint8(der[ix + 1] & 0x7F);
-            require(lengthbytesLength <= 4, "Encoding too long");
+            if (lengthbytesLength > 4) {
+                return (ErrorCode.EncodingTooLong, 0);
+            }
             if (lengthbytesLength == 1) length = der.readUint8(ix + 2);
             else if (lengthbytesLength == 2) {
                 length = der.readUint16(ix + 2);
@@ -248,8 +296,12 @@ library Asn1Decode {
             ixFirstContentByte = uint80(ix + 2 + lengthbytesLength);
             ixLastContentByte = uint80(ixFirstContentByte + length - 1);
         }
-
-        require(length <= der.length, "Input bytes string is too short");
-        return NodePtr.getPtr(ix, ixFirstContentByte, ixLastContentByte);
+        if (ixFirstContentByte > ixLastContentByte || ixLastContentByte >= der.length) {
+            return (ErrorCode.WrongLength, 0);
+        }
+        return (
+            ErrorCode.NoError,
+            NodePtr.getPtr(ix, ixFirstContentByte, ixLastContentByte)
+        );
     }
 }
