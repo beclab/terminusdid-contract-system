@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.21;
 
-import {Context} from "openzeppelin/utils/Context.sol";
-import {IERC165, ERC165} from "openzeppelin/utils/introspection/ERC165.sol";
-import {IERC721} from "openzeppelin/token/ERC721/IERC721.sol";
-import {IERC721Enumerable} from "openzeppelin/token/ERC721/extensions/IERC721Enumerable.sol";
-import {IERC721Metadata} from "openzeppelin/token/ERC721/extensions/IERC721Metadata.sol";
-import {IERC721Receiver} from "openzeppelin/token/ERC721/IERC721Receiver.sol";
+import {Context} from "@openzeppelin/contracts/utils/Context.sol";
+import {IERC165, ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol";
+import {IERC721Metadata} from "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 import {IERC721EnumerableErrors} from "./IERC721EnumerableErrors.sol";
 
@@ -51,6 +51,10 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
 
     error TokenExists();
 
+    error TooManyTokens();
+
+    error TooManyTags();
+
     modifier onlyManager() {
         if (_msgSender() != _manager) {
             revert NotManager();
@@ -73,12 +77,16 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
                               DID Services
     //////////////////////////////////////////////////////////////*/
 
+    function manager() public view returns (address) {
+        return _manager;
+    }
+
     function getNodeInfo(uint256 tokenId) public view returns (Node memory) {
         return _nodes[tokenId];
     }
 
-    function getTagValue(uint256 tokenId, bytes8 key) public view returns (bytes memory) {
-        return _tags[tokenId].values[key];
+    function getTagValue(uint256 tokenId, bytes8 key) public view returns (bool exists, bytes memory value) {
+        (exists,, value) = _getTag(_tags[tokenId], key);
     }
 
     function getTagKeys(uint256 tokenId) public view returns (bytes8[] memory) {
@@ -90,11 +98,7 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
     }
 
     function setTag(uint256 tokenId, bytes8 key, bytes memory value) public onlyManager {
-        TagGroup storage tags = _tags[tokenId];
-        if (tags.values[key].length == 0) {
-            tags.keys.push(key);
-        }
-        tags.values[key] = value;
+        _setTag(_tags[tokenId], key, value);
     }
 
     function register(string memory domain, string memory did, address owner, Kind kind)
@@ -242,7 +246,7 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
             }
             uint256 nextIndex = _tokens.length;
             if (nextIndex > type(uint40).max) {
-                revert ERC721OutOfBoundsIndex(address(0), nextIndex);
+                revert TooManyTokens();
             }
             node.index = uint40(nextIndex);
             _tokens.push(tokenId);
@@ -259,7 +263,6 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
             delete node.owner;
             // ERC721 standard seems to suggest not emitting Approval event on transfer
             delete node.approved;
-            _clearTags(tokenId);
         }
 
         if (to == address(0)) {
@@ -274,6 +277,7 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
             delete node.index;
             delete node.indexByOwner;
             node.kind = Kind.Unknown;
+            _clearTags(tokenId);
         } else {
             uint256[] storage ownedTokens = _ownedTokens[to];
             node.indexByOwner = uint40(ownedTokens.length);
@@ -313,5 +317,50 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
             delete tags.values[tags.keys[i]];
         }
         delete tags.keys;
+    }
+
+    function _getTag(TagGroup storage tags, bytes8 key)
+        internal
+        view
+        returns (bool exists, uint16 index, bytes memory value)
+    {
+        value = tags.values[key];
+        if (value.length == 0) {
+            return (false, 0, "");
+        }
+        exists = true;
+        assembly ("memory-safe") {
+            index := and(0xffff, mload(add(value, mload(value))))
+            mstore(value, sub(mload(value), 2))
+        }
+    }
+
+    function _setTag(TagGroup storage tags, bytes8 key, bytes memory value) internal {
+        (bool exists, uint16 index,) = _getTag(tags, key);
+        if (value.length == 0) {
+            if (exists) {
+                uint256 moveIndex = tags.keys.length - 1;
+                if (moveIndex != index) {
+                    bytes8 moveKey = tags.keys[moveIndex];
+                    tags.keys[index] = moveKey;
+                    bytes storage moveValue = tags.values[moveKey];
+                    uint256 moveValueLength = moveValue.length;
+                    moveValue[moveValueLength - 2] = bytes1(bytes2(index));
+                    moveValue[moveValueLength - 1] = bytes1(uint8(index));
+                }
+                tags.keys.pop();
+                delete tags.values[key];
+            }
+            return;
+        }
+        if (!exists) {
+            uint256 nextIndex = tags.keys.length;
+            if (nextIndex > type(uint16).max) {
+                revert TooManyTags();
+            }
+            index = uint16(nextIndex);
+            tags.keys.push(key);
+        }
+        tags.values[key] = abi.encodePacked(value, index);
     }
 }
