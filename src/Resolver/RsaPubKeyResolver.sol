@@ -10,6 +10,8 @@ RSAPublicKey ::= SEQUENCE {
     modulus           INTEGER,  -- n
     publicExponent    INTEGER   -- e
 }
+refs to: https://www.rfc-editor.org/rfc/rfc3447#appendix-A.1
+         http://luca.ntop.org/Teaching/Appunti/asn1.html
 */
 contract RsaPubKeyResolver {
     using Asn1Decode for bytes;
