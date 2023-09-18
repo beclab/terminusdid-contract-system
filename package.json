@@ -27,7 +27,8 @@
     "@types/chai": "^4.3.6",
     "@types/mocha": "^9.1.1",
     "hardhat": "^2.11.1",
-    "hardhat-preprocessor": "^0.1.5"
+    "hardhat-preprocessor": "^0.1.5",
+    "node-rsa": "^1.1.1"
   },
   "scripts": {
     "test": "mocha"
