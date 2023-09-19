@@ -356,7 +356,7 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
                 delete tags.values[key];
                 addedOrRemoved = true;
             }
-            return;
+            return addedOrRemoved;
         }
         if (!exists) {
             uint256 nextIndex = tags.keys.length;
