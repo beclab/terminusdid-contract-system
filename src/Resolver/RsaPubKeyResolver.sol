@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.21;
 
-import "forge-std/console.sol";
 import "../utils/Asn1Decode.sol";
 
 /*
@@ -16,14 +15,14 @@ refs to: https://www.rfc-editor.org/rfc/rfc3447#appendix-A.1
 contract RsaPubKeyResolver {
     using Asn1Decode for bytes;
 
-    mapping(Asn1Decode.ErrorCode => string) errorMap;
+    mapping(Asn1Decode.ErrorCode => string) _errorMap;
 
     constructor() {
-        errorMap[Asn1Decode.ErrorCode.NotTypeSequenceString] = "NotTypeSequenceString";
-        errorMap[Asn1Decode.ErrorCode.NotTypeInteger] = "NotTypeInteger";
-        errorMap[Asn1Decode.ErrorCode.NotPositive] = "NotPositive";
-        errorMap[Asn1Decode.ErrorCode.EncodingTooLong] = "EncodingTooLong";
-        errorMap[Asn1Decode.ErrorCode.WrongLength] = "WrongLength";
+        _errorMap[Asn1Decode.ErrorCode.NotTypeSequenceString] = "NotTypeSequenceString";
+        _errorMap[Asn1Decode.ErrorCode.NotTypeInteger] = "NotTypeInteger";
+        _errorMap[Asn1Decode.ErrorCode.NotPositive] = "NotPositive";
+        _errorMap[Asn1Decode.ErrorCode.EncodingTooLong] = "EncodingTooLong";
+        _errorMap[Asn1Decode.ErrorCode.WrongLength] = "WrongLength";
     }
 
     function validate(bytes calldata pubKey) public pure returns (bool) {
@@ -65,30 +64,30 @@ contract RsaPubKeyResolver {
         uint256 sequenceRange;
         (errorCode, sequenceRange) = pubKey.rootOfSequenceStringAt(0);
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            revert(errorMap[errorCode]);
+            revert(_errorMap[errorCode]);
         }
         bytes memory sequence = pubKey.bytesAt(sequenceRange);
 
         uint256 modulusRange;
         (errorCode, modulusRange) = sequence.root();
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            revert(errorMap[errorCode]);
+            revert(_errorMap[errorCode]);
         }
 
         (errorCode, modulus) = sequence.uintBytesAt(modulusRange);
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            revert(errorMap[errorCode]);
+            revert(_errorMap[errorCode]);
         }
 
         uint256 publicExponentRange;
         (errorCode, publicExponentRange) = sequence.nextSiblingOf(modulusRange);
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            revert(errorMap[errorCode]);
+            revert(_errorMap[errorCode]);
         }
 
         (errorCode, publicExponent) = sequence.uintAt(publicExponentRange);
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            revert(errorMap[errorCode]);
+            revert(_errorMap[errorCode]);
         }
     }
 }
