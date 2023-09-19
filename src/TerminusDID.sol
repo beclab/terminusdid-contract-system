@@ -97,8 +97,12 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
         return _tags[tokenId].keys.length;
     }
 
-    function setTag(uint256 tokenId, bytes8 key, bytes calldata value) public onlyManager {
-        _setTag(_tags[tokenId], key, value);
+    function setTag(uint256 tokenId, bytes8 key, bytes calldata value)
+        public
+        onlyManager
+        returns (bool addedOrRemoved)
+    {
+        return _setTag(_tags[tokenId], key, value);
     }
 
     function register(string calldata domain, string calldata did, address owner, Kind kind)
@@ -161,14 +165,14 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
         if (index >= totalSupply()) {
             revert ERC721OutOfBoundsIndex(address(0), index);
         }
-        return uint256(_tokens[index]);
+        return _tokens[index];
     }
 
     function tokenOfOwnerByIndex(address owner, uint256 index) public view returns (uint256) {
         if (index >= balanceOf(owner)) {
             revert ERC721OutOfBoundsIndex(owner, index);
         }
-        return uint256(_ownedTokens[owner][index]);
+        return _ownedTokens[owner][index];
     }
 
     function approve(address to, uint256 tokenId) public {
@@ -335,7 +339,7 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
         }
     }
 
-    function _setTag(TagGroup storage tags, bytes8 key, bytes memory value) internal {
+    function _setTag(TagGroup storage tags, bytes8 key, bytes memory value) internal returns (bool addedOrRemoved) {
         (bool exists, uint16 index,) = _getTag(tags, key);
         if (value.length == 0) {
             if (exists) {
@@ -350,6 +354,7 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
                 }
                 tags.keys.pop();
                 delete tags.values[key];
+                addedOrRemoved = true;
             }
             return;
         }
@@ -360,6 +365,7 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
             }
             index = uint16(nextIndex);
             tags.keys.push(key);
+            addedOrRemoved = true;
         }
         tags.values[key] = bytes.concat(value, bytes2(index));
     }
