@@ -19,15 +19,11 @@ contract RsaPubKeyResolver {
     mapping(Asn1Decode.ErrorCode => string) errorMap;
 
     constructor() {
-        errorMap[
-            Asn1Decode.ErrorCode.NotTypeSequenceString
-        ] = "NotTypeSequenceString";
+        errorMap[Asn1Decode.ErrorCode.NotTypeSequenceString] = "NotTypeSequenceString";
         errorMap[Asn1Decode.ErrorCode.NotTypeInteger] = "NotTypeInteger";
         errorMap[Asn1Decode.ErrorCode.NotPositive] = "NotPositive";
         errorMap[Asn1Decode.ErrorCode.EncodingTooLong] = "EncodingTooLong";
-        errorMap[
-            Asn1Decode.ErrorCode.WrongLength
-        ] = "WrongLength";
+        errorMap[Asn1Decode.ErrorCode.WrongLength] = "WrongLength";
     }
 
     function validate(bytes calldata pubKey) public pure returns (bool) {
@@ -45,7 +41,7 @@ contract RsaPubKeyResolver {
             return false;
         }
 
-        (errorCode, ) = sequence.uintBytesAt(modulusRange);
+        (errorCode,) = sequence.uintBytesAt(modulusRange);
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
             return false;
         }
@@ -56,7 +52,7 @@ contract RsaPubKeyResolver {
             return false;
         }
 
-        (errorCode, ) = sequence.uintAt(publicExponentRange);
+        (errorCode,) = sequence.uintAt(publicExponentRange);
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
             return false;
         }
@@ -64,9 +60,7 @@ contract RsaPubKeyResolver {
         return true;
     }
 
-    function parse(
-        bytes calldata pubKey
-    ) public view returns (bytes memory modulus, uint256 publicExponent) {
+    function parse(bytes calldata pubKey) public view returns (bytes memory modulus, uint256 publicExponent) {
         Asn1Decode.ErrorCode errorCode;
         uint256 sequenceRange;
         (errorCode, sequenceRange) = pubKey.rootOfSequenceStringAt(0);
