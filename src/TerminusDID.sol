@@ -97,11 +97,11 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
         return _tags[tokenId].keys.length;
     }
 
-    function setTag(uint256 tokenId, bytes8 key, bytes memory value) public onlyManager {
+    function setTag(uint256 tokenId, bytes8 key, bytes calldata value) public onlyManager {
         _setTag(_tags[tokenId], key, value);
     }
 
-    function register(string memory domain, string memory did, address owner, Kind kind)
+    function register(string calldata domain, string calldata did, address owner, Kind kind)
         public
         onlyManager
         returns (uint256 tokenId)
@@ -344,9 +344,9 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
                     bytes8 moveKey = tags.keys[moveIndex];
                     tags.keys[index] = moveKey;
                     bytes storage moveValue = tags.values[moveKey];
-                    uint256 moveValueLength = moveValue.length;
-                    moveValue[moveValueLength - 2] = bytes1(bytes2(index));
-                    moveValue[moveValueLength - 1] = bytes1(uint8(index));
+                    uint256 lastByteIndex = moveValue.length - 1;
+                    moveValue[lastByteIndex - 1] = bytes1(bytes2(index));
+                    moveValue[lastByteIndex] = bytes1(uint8(index));
                 }
                 tags.keys.pop();
                 delete tags.values[key];
@@ -361,6 +361,6 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
             index = uint16(nextIndex);
             tags.keys.push(key);
         }
-        tags.values[key] = abi.encodePacked(value, index);
+        tags.values[key] = bytes.concat(value, bytes2(index));
     }
 }
