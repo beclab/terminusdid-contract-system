@@ -4,7 +4,7 @@ const { ethers } = require('hardhat');
 
 const { getContractFactory } = ethers;
 
-describe('DnsResolver test', function () {
+describe('DnsARecordResolver test', function () {
 
     async function deployTokenFixture() {
 
@@ -17,7 +17,7 @@ describe('DnsResolver test', function () {
 
     function ipStringToUint8Array(ip) {
         const uint8 = new Uint8Array(4);
-        ip.split('.').forEach( (num, index) => {
+        ip.split('.').forEach((num, index) => {
             num = Number(num);
             if (num > 255 | num < 0) {
                 throw new Error('invalid ip address');
@@ -25,6 +25,14 @@ describe('DnsResolver test', function () {
             uint8[index] = num;
         })
         return uint8;
+    }
+
+    function ipUint8ArrayToString(uint8Array) {
+        let ip = '';
+        for (let item of uint8Array) {
+            ip += item.toString() + '.';
+        }
+        return ip.substring(0, ip.length - 1);
     }
 
     it('can parse dns a records bytes', async function () {
@@ -37,11 +45,12 @@ describe('DnsResolver test', function () {
             '123.123.123.123'
         ]
 
-        for(let ip of ips) {
+        for (let ip of ips) {
             let ipUint8 = ipStringToUint8Array(ip);
             let ipBufferStr = '0x' + Buffer.from(ipUint8).toString('hex');
-            await dnsARecordResolver.parse(ipBufferStr);
+            const ret = await dnsARecordResolver.parse(ipBufferStr);
+            const ipStr = ipUint8ArrayToString(ret);
+            expect(ipStr).to.equal(ip);
         }
-        
     });
 });
