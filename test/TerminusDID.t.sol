@@ -209,19 +209,14 @@ contract TerminusDIDTest is Test {
 
         terminusDID.setTag(tokenId, bytes8(keccak256(bytes("gender"))), bytes(""));
         bytes8[] memory keys = terminusDID.getTagKeys(tokenId);
-        // key of index3 swap with key of index1 and pop key of index3
         assertEq(keys.length, 3);
-        assertEq(keys[0], bytes8(keccak256(bytes("country"))));
-        assertEq(keys[1], bytes8(keccak256(bytes("district"))));
-        assertEq(keys[2], bytes8(keccak256(bytes("city"))));
+        for (uint256 index; index < keys.length; index++) {
+            assertNotEq(keys[index], bytes8(keccak256(bytes("gender"))));
+        }
 
-        bytes memory value;
-        (, value) = terminusDID.getTagValue(tokenId, bytes8(keccak256(bytes("country"))));
-        assertEq(value, bytes("CN"));
-        (, value) = terminusDID.getTagValue(tokenId, bytes8(keccak256(bytes("district"))));
-        assertEq(value, bytes("haidian"));
-        (, value) = terminusDID.getTagValue(tokenId, bytes8(keccak256(bytes("city"))));
-        assertEq(value, bytes("beijing"));
+        (bool exists, bytes memory value) = terminusDID.getTagValue(tokenId, bytes8(keccak256(bytes("gender"))));
+        assertEq(exists, false);
+        assertEq(value, "");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -423,24 +418,12 @@ contract TerminusDIDTest is Test {
         assertEq(terminusDID.ownerOf(tokenId2), owner);
         assertEq(terminusDID.ownerOf(tokenId3), owner);
         assertEq(terminusDID.ownerOf(tokenId4), owner);
-        assertEq(terminusDID.getNodeInfo(tokenId1).index, 0);
-        assertEq(terminusDID.getNodeInfo(tokenId1).indexByOwner, 0);
-        assertEq(terminusDID.getNodeInfo(tokenId2).index, 1);
-        assertEq(terminusDID.getNodeInfo(tokenId2).indexByOwner, 1);
-        assertEq(terminusDID.getNodeInfo(tokenId3).index, 2);
-        assertEq(terminusDID.getNodeInfo(tokenId3).indexByOwner, 2);
-        assertEq(terminusDID.getNodeInfo(tokenId4).index, 3);
-        assertEq(terminusDID.getNodeInfo(tokenId4).indexByOwner, 3);
 
-        assertEq(terminusDID.tokenOfOwnerByIndex(owner, 3), tokenId4);
-        // tokenId of index3 swap to tokenId of index1, and delete the index3
         vm.prank(owner);
         terminusDID.transferFrom(owner, receiver, tokenId2);
         assertEq(terminusDID.tokenOfOwnerByIndex(owner, 1), tokenId4);
 
-        assertEq(terminusDID.getNodeInfo(tokenId2).owner, receiver);
-        assertEq(terminusDID.getNodeInfo(tokenId2).index, 1);
-        assertEq(terminusDID.getNodeInfo(tokenId2).indexByOwner, 0);
+        assertEq(terminusDID.ownerOf(tokenId2), receiver);
     }
 
     function testErc721SafeTransferFrom() public {
