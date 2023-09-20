@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.21;
 
-import "../utils/Asn1Decode.sol";
+import {Asn1Decode} from "../utils/Asn1Decode.sol";
 
 /*
 support RSA Pkcs1 ASN.1 format

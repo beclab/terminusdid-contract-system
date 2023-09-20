@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import "ens-contracts/dnssec-oracle/BytesUtils.sol";
+import {BytesUtils} from "ens-contracts/dnssec-oracle/BytesUtils.sol";
 
 // credits to https://github.com/JonahGroendal/asn1-decode
 library NodePtr {
