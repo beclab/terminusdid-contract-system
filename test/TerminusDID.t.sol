@@ -4,6 +4,7 @@ pragma solidity ^0.8.18;
 import {Test} from "forge-std/Test.sol";
 import {TerminusDID} from "../src/TerminusDID.sol";
 import {IERC721EnumerableErrors} from "../src/IERC721EnumerableErrors.sol";
+import {ERC721Receiver, ERC721InvalidReceiver} from "./Mock/ERC721Receiver.sol";
 
 contract TerminusDIDTest is Test {
     TerminusDID public terminusDID;
@@ -16,6 +17,7 @@ contract TerminusDIDTest is Test {
 
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
+    event ReceivedERC721Token(address indexed operator, address indexed from, uint256 indexed tokenId, bytes data);
 
     function setUp() public {
         terminusDID = new TerminusDID(_name, _symbol, _manager);
@@ -225,6 +227,10 @@ contract TerminusDIDTest is Test {
     /*//////////////////////////////////////////////////////////////
                              ERC721 test
     //////////////////////////////////////////////////////////////*/
+    function testIsErc721() public {
+        bytes4 erc721InterfaceId = bytes4(0x80ac58cd);
+        assertEq(terminusDID.supportsInterface(erc721InterfaceId), true);
+    }
 
     function testErc721Basis() public {
         address owner = address(100);
@@ -435,5 +441,30 @@ contract TerminusDIDTest is Test {
         assertEq(terminusDID.getNodeInfo(tokenId2).owner, receiver);
         assertEq(terminusDID.getNodeInfo(tokenId2).index, 1);
         assertEq(terminusDID.getNodeInfo(tokenId2).indexByOwner, 0);
+    }
+
+    function testErc721SafeTransferFrom() public {
+        ERC721Receiver receiver = new ERC721Receiver();
+
+        address owner = address(100);
+        TerminusDID.Kind kind = TerminusDID.Kind.Person;
+        uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
+
+        vm.prank(owner);
+        vm.expectEmit(true, true, true, true);
+        emit ReceivedERC721Token(owner, owner, tokenId, "");
+        terminusDID.safeTransferFrom(owner, address(receiver), tokenId);
+    }
+
+    function testErc721SafeTransferFromWithInvalidReceiver() public {
+        ERC721InvalidReceiver receiver = new ERC721InvalidReceiver();
+
+        address owner = address(100);
+        TerminusDID.Kind kind = TerminusDID.Kind.Person;
+        uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
+
+        vm.prank(owner);
+        vm.expectRevert("this is a invalid erc721 receiver");
+        terminusDID.safeTransferFrom(owner, address(receiver), tokenId);
     }
 }
