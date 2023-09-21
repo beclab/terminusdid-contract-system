@@ -45,12 +45,13 @@ contract TerminusDIDTest is Test {
 
         assertEq(tokenId, tokenIdCalc);
 
-        TerminusDID.Node memory node = terminusDID.getNodeInfo(tokenId);
+        (string memory tDomain, string memory tDID, address tOwner, TerminusDID.Kind tKind) =
+            terminusDID.getMetaInfo(tokenId);
 
-        assertEq(_domain, node.domain);
-        assertEq(_did, node.did);
-        assertEq(owner, node.owner);
-        assertEq(uint8(kind), uint8(node.kind));
+        assertEq(_domain, tDomain);
+        assertEq(_did, tDID);
+        assertEq(owner, tOwner);
+        assertEq(uint8(kind), uint8(tKind));
     }
 
     function testRegisterNotByManager() public {
