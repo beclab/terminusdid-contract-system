@@ -11,7 +11,7 @@ import {IResolver} from "./resolvers/IResolver.sol";
 
 contract Registrar is Context, Ownable2Step {
     using DomainUtils for string;
-    using DomainUtils for DomainUtils.Slice;
+    using DomainUtils for uint256;
     using Permissions for TerminusDID;
 
     TerminusDID private _registry;
@@ -68,7 +68,7 @@ contract Registrar is Context, Ownable2Step {
     }
 
     function setTag(string calldata domain, bytes8 key, bytes calldata value) public returns (bool addedOrRemoved) {
-        DomainUtils.Slice[] memory levels = domain.traceLevels();
+        uint256[] memory levels = domain.allLevels();
 
         address caller = _msgSender();
         if (!(caller == owner() || _registry.allowSetTag(_msgSender(), levels, key))) {

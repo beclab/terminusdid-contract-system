@@ -6,7 +6,7 @@ import {DomainUtils} from "./utils/DomainUtils.sol";
 
 library Permissions {
     using DomainUtils for string;
-    using DomainUtils for DomainUtils.Slice;
+    using DomainUtils for uint256;
 
     using {_getOwner} for TerminusDID;
 
@@ -16,7 +16,7 @@ library Permissions {
 
     error NonexistentDomain();
 
-    function allowSetTag(TerminusDID registry, address auth, DomainUtils.Slice[] memory levels, bytes8 key)
+    function allowSetTag(TerminusDID registry, address auth, uint256[] memory levels, bytes8 key)
         internal
         view
         returns (bool)
@@ -33,7 +33,7 @@ library Permissions {
     }
 
     function allowRegister(TerminusDID registry, address auth, string memory domain) internal view returns (bool) {
-        for (DomainUtils.Slice memory ds = domain.asSlice(); !ds.isEmpty(); ds.detachSub()) {
+        for (uint256 ds = domain.asSlice(); !ds.isEmpty(); ds = ds.parent()) {
             if (registry._getOwner(ds.tokenId()) == auth) {
                 return true;
             }

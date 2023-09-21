@@ -317,7 +317,7 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
                 if (reason.length == 0) {
                     revert ERC721InvalidReceiver(to);
                 } else {
-                    assembly ("memory-safe") {
+                    assembly {
                         revert(add(32, reason), mload(reason))
                     }
                 }
