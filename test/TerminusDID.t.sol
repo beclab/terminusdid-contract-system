@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.18;
+pragma solidity 0.8.21;
 
 import {Test} from "forge-std/Test.sol";
 import {TerminusDID} from "../src/TerminusDID.sol";
@@ -33,10 +33,11 @@ contract TerminusDIDTest is Test {
                              Register test
     //////////////////////////////////////////////////////////////*/
 
-    function testRegister() public {
-        address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
+    function testFuzzRegister(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
 
+        address owner = address(100);
         uint256 tokenIdCalc = uint256(keccak256(bytes(_domain)));
 
         vm.expectEmit(true, true, true, false);
@@ -54,10 +55,12 @@ contract TerminusDIDTest is Test {
         assertEq(uint8(kind), uint8(tKind));
     }
 
-    function testRegisterNotByManager() public {
+    function testFuzzRegisterNotByManager(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address notManager = address(1);
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
 
         vm.prank(notManager);
         vm.expectRevert(TerminusDID.NotManager.selector);
@@ -72,18 +75,22 @@ contract TerminusDIDTest is Test {
         terminusDID.register(_domain, _did, owner, kind);
     }
 
-    function testRegisterDuplicateDomain() public {
+    function testFuzzRegisterDuplicateDomain(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
 
         terminusDID.register(_domain, _did, owner, kind);
         vm.expectRevert(TerminusDID.TokenExists.selector);
         terminusDID.register(_domain, _did, owner, kind);
     }
 
-    function testRegisterToZeroAddressOwner() public {
+    function testFuzzRegisterToZeroAddressOwner(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(0);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenIdCalc = uint256(keccak256(bytes(_domain)));
 
         vm.expectRevert(abi.encodeWithSelector(IERC721EnumerableErrors.ERC721NonexistentToken.selector, tokenIdCalc));
@@ -94,9 +101,11 @@ contract TerminusDIDTest is Test {
                              Set tag test
     //////////////////////////////////////////////////////////////*/
 
-    function testSetTag() public {
+    function testFuzzSetTag(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
         string memory keyStr = "nickname";
@@ -121,9 +130,11 @@ contract TerminusDIDTest is Test {
         assertEq(valueStr, string(valueFromContract));
     }
 
-    function testSetNonExistEmptyTag() public {
+    function testFuzzSetNonExistEmptyTag(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
         string memory keyStr = "nickname";
@@ -140,9 +151,11 @@ contract TerminusDIDTest is Test {
         assertEq(valueFromContract, "");
     }
 
-    function testModityTag() public {
+    function testFuzzModityTag(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
         string memory keyStr = "nickname";
@@ -168,9 +181,11 @@ contract TerminusDIDTest is Test {
         assertEq(newValueStr, string(valueFromContract));
     }
 
-    function testDeleteTag() public {
+    function testFuzzDeleteTag(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
         string memory keyStr = "nickname";
@@ -198,9 +213,11 @@ contract TerminusDIDTest is Test {
         assertEq(keys.length, 0);
     }
 
-    function testDeleteTagMoveIndex() public {
+    function testFuzzDeleteTagMoveIndex(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
         terminusDID.setTag(tokenId, bytes8(keccak256(bytes("country"))), bytes("CN"));
@@ -228,10 +245,12 @@ contract TerminusDIDTest is Test {
         assertEq(terminusDID.supportsInterface(erc721InterfaceId), true);
     }
 
-    function testErc721Basis() public {
+    function testFuzzErc721Basis(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
         address zeroAddr = address(0);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId1 = terminusDID.register(_domain, _did, owner, kind);
         uint256 tokenId2 = terminusDID.register("test2.com", _did, owner, kind);
 
@@ -258,9 +277,11 @@ contract TerminusDIDTest is Test {
         terminusDID.tokenOfOwnerByIndex(owner, 2);
     }
 
-    function testErc721TransferByOwner() public {
+    function testFuzzErc721TransferByOwner(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
         assertEq(terminusDID.ownerOf(tokenId), owner);
 
@@ -274,9 +295,11 @@ contract TerminusDIDTest is Test {
         assertEq(terminusDID.ownerOf(tokenId), receiver);
     }
 
-    function testErc721TransferByApprover() public {
+    function testFuzzErc721TransferByApprover(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
         assertEq(terminusDID.ownerOf(tokenId), owner);
 
@@ -296,9 +319,11 @@ contract TerminusDIDTest is Test {
         assertEq(terminusDID.ownerOf(tokenId), receiver);
     }
 
-    function testErc721TransferByOperator() public {
+    function testFuzzErc721TransferByOperator(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
         assertEq(terminusDID.ownerOf(tokenId), owner);
 
@@ -315,9 +340,11 @@ contract TerminusDIDTest is Test {
         assertEq(terminusDID.ownerOf(tokenId), receiver);
     }
 
-    function testErc721ApproveByOwner() public {
+    function testFuzzErc721ApproveByOwner(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
         assertEq(terminusDID.ownerOf(tokenId), owner);
 
@@ -330,9 +357,11 @@ contract TerminusDIDTest is Test {
         assertEq(terminusDID.getApproved(tokenId), receiver);
     }
 
-    function testErc721ApproveByOperator() public {
+    function testFuzzErc721ApproveByOperator(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
         assertEq(terminusDID.ownerOf(tokenId), owner);
 
@@ -348,9 +377,11 @@ contract TerminusDIDTest is Test {
         assertEq(terminusDID.getApproved(tokenId), receiver);
     }
 
-    function testErc721InvalidApprover() public {
+    function testFuzzErc721InvalidApprover(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
         assertEq(terminusDID.ownerOf(tokenId), owner);
 
@@ -360,9 +391,11 @@ contract TerminusDIDTest is Test {
         terminusDID.approve(receiver, tokenId);
     }
 
-    function testErc721OperatorCannotBeZeroAddress() public {
+    function testFuzzErc721OperatorCannotBeZeroAddress(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
         assertEq(terminusDID.ownerOf(tokenId), owner);
 
@@ -373,9 +406,11 @@ contract TerminusDIDTest is Test {
         terminusDID.setApprovalForAll(operator, true);
     }
 
-    function testErc721TransferInvalidParams() public {
+    function testFuzzErc721TransferInvalidParams(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
         address zeroAddress = address(0);
@@ -405,11 +440,13 @@ contract TerminusDIDTest is Test {
         terminusDID.transferFrom(owner, receiver, tokenId);
     }
 
-    function testErc721TransferOwnerFromMultipleNodes() public {
+    function testFuzzErc721TransferOwnerFromMultipleNodes(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         address owner = address(100);
         address receiver = address(200);
 
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId1 = terminusDID.register(_domain, _did, owner, kind);
         uint256 tokenId2 = terminusDID.register("test2.com", _did, owner, kind);
         uint256 tokenId3 = terminusDID.register("test3.com", _did, owner, kind);
@@ -427,11 +464,13 @@ contract TerminusDIDTest is Test {
         assertEq(terminusDID.ownerOf(tokenId2), receiver);
     }
 
-    function testErc721SafeTransferFrom() public {
+    function testFuzzErc721SafeTransferFrom(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         ERC721Receiver receiver = new ERC721Receiver();
 
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
         vm.prank(owner);
@@ -440,11 +479,13 @@ contract TerminusDIDTest is Test {
         terminusDID.safeTransferFrom(owner, address(receiver), tokenId);
     }
 
-    function testErc721SafeTransferFromWithInvalidReceiver() public {
+    function testFuzzErc721SafeTransferFromWithInvalidReceiver(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
         ERC721InvalidReceiver receiver = new ERC721InvalidReceiver();
 
         address owner = address(100);
-        TerminusDID.Kind kind = TerminusDID.Kind.Person;
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
         vm.prank(owner);
