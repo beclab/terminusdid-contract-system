@@ -178,10 +178,10 @@ library Asn1Decode {
      */
     function uintBytesAt(bytes memory der, uint256 ptr) internal pure returns (ErrorCode, bytes memory) {
         if (der[ptr.ixs()] != 0x02) {
-            return (ErrorCode.NotTypeInteger, bytes(""));
+            return (ErrorCode.NotTypeInteger, "");
         }
         if (der[ptr.ixf()] & 0x80 != 0) {
-            return (ErrorCode.NotPositive, bytes(""));
+            return (ErrorCode.NotPositive, "");
         }
         uint256 valueLength = ptr.ixl() + 1 - ptr.ixf();
         if (der[ptr.ixf()] == 0) {
@@ -208,11 +208,11 @@ library Asn1Decode {
     function bitstringAt(bytes memory der, uint256 ptr) internal pure returns (ErrorCode, bytes memory) {
         require(der[ptr.ixs()] == 0x03, "Not type BIT STRING");
         if (der[ptr.ixs()] != 0x03) {
-            return (ErrorCode.NotTypeBitString, bytes(""));
+            return (ErrorCode.NotTypeBitString, "");
         }
         // Only 00 padded bitstr can be converted to bytestr!
         if (der[ptr.ixf()] != 0x00) {
-            return (ErrorCode.BitStringNotPaddedWithZero, bytes(""));
+            return (ErrorCode.BitStringNotPaddedWithZero, "");
         }
         uint256 valueLength = ptr.ixl() + 1 - ptr.ixf();
         return (ErrorCode.NoError, der.substring(ptr.ixf() + 1, valueLength - 1));

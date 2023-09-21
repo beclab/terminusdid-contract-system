@@ -129,7 +129,7 @@ contract TerminusDIDTest is Test {
         string memory keyStr = "nickname";
         bytes8 key = bytes8(keccak256(bytes(keyStr)));
 
-        bool addedOrRemoved = terminusDID.setTag(tokenId, key, bytes(""));
+        bool addedOrRemoved = terminusDID.setTag(tokenId, key, "");
         assertEq(addedOrRemoved, false);
 
         uint256 tagCount = terminusDID.getTagCount(tokenId);
@@ -137,7 +137,7 @@ contract TerminusDIDTest is Test {
 
         (bool exists, bytes memory valueFromContract) = terminusDID.getTagValue(tokenId, key);
         assertEq(exists, false);
-        assertEq(valueFromContract, bytes(""));
+        assertEq(valueFromContract, "");
     }
 
     function testModityTag() public {
@@ -186,7 +186,7 @@ contract TerminusDIDTest is Test {
         keys = terminusDID.getTagKeys(tokenId);
         assertEq(keys.length, 1);
 
-        bytes memory newValue = bytes("");
+        bytes memory newValue = "";
         addedOrRemoved = terminusDID.setTag(tokenId, key, newValue);
         assertEq(addedOrRemoved, true);
 
@@ -208,7 +208,7 @@ contract TerminusDIDTest is Test {
         terminusDID.setTag(tokenId, bytes8(keccak256(bytes("city"))), bytes("beijing"));
         terminusDID.setTag(tokenId, bytes8(keccak256(bytes("district"))), bytes("haidian"));
 
-        terminusDID.setTag(tokenId, bytes8(keccak256(bytes("gender"))), bytes(""));
+        terminusDID.setTag(tokenId, bytes8(keccak256(bytes("gender"))), "");
         bytes8[] memory keys = terminusDID.getTagKeys(tokenId);
         assertEq(keys.length, 3);
         for (uint256 index; index < keys.length; index++) {

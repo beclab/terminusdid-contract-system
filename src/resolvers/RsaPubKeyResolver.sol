@@ -15,79 +15,73 @@ refs to: https://www.rfc-editor.org/rfc/rfc3447#appendix-A.1
 contract RsaPubKeyResolver {
     using Asn1Decode for bytes;
 
-    mapping(Asn1Decode.ErrorCode => string) _errorMap;
-
-    constructor() {
-        _errorMap[Asn1Decode.ErrorCode.NotTypeSequenceString] = "NotTypeSequenceString";
-        _errorMap[Asn1Decode.ErrorCode.NotTypeInteger] = "NotTypeInteger";
-        _errorMap[Asn1Decode.ErrorCode.NotPositive] = "NotPositive";
-        _errorMap[Asn1Decode.ErrorCode.EncodingTooLong] = "EncodingTooLong";
-        _errorMap[Asn1Decode.ErrorCode.WrongLength] = "WrongLength";
-    }
-
-    function validate(bytes calldata pubKey) public pure returns (bool) {
+    function rsaPubKeyResolverValidate(bytes calldata pubKey) public pure returns (uint256) {
         Asn1Decode.ErrorCode errorCode;
         uint256 sequenceRange;
         (errorCode, sequenceRange) = pubKey.rootOfSequenceStringAt(0);
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            return false;
+            return 5;
         }
         bytes memory sequence = pubKey.bytesAt(sequenceRange);
 
         uint256 modulusRange;
         (errorCode, modulusRange) = sequence.root();
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            return false;
+            return 5;
         }
 
         (errorCode,) = sequence.uintBytesAt(modulusRange);
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            return false;
+            return 5;
         }
 
         uint256 publicExponentRange;
         (errorCode, publicExponentRange) = sequence.nextSiblingOf(modulusRange);
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            return false;
+            return 5;
         }
 
         (errorCode,) = sequence.uintAt(publicExponentRange);
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            return false;
+            return 5;
         }
 
-        return true;
+        return 0;
     }
 
-    function parse(bytes calldata pubKey) public view returns (bytes memory modulus, uint256 publicExponent) {
+    function rsaPubKeyResolverParse(bytes calldata pubKey) public pure returns (uint256, bytes memory) {
         Asn1Decode.ErrorCode errorCode;
         uint256 sequenceRange;
         (errorCode, sequenceRange) = pubKey.rootOfSequenceStringAt(0);
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            revert(_errorMap[errorCode]);
+            return (5, "");
         }
         bytes memory sequence = pubKey.bytesAt(sequenceRange);
 
         uint256 modulusRange;
         (errorCode, modulusRange) = sequence.root();
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            revert(_errorMap[errorCode]);
+            return (5, "");
         }
 
+        bytes memory modulus;
         (errorCode, modulus) = sequence.uintBytesAt(modulusRange);
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            revert(_errorMap[errorCode]);
+            return (5, "");
         }
 
         uint256 publicExponentRange;
         (errorCode, publicExponentRange) = sequence.nextSiblingOf(modulusRange);
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            revert(_errorMap[errorCode]);
+            return (5, "");
         }
 
+        uint256 publicExponent;
         (errorCode, publicExponent) = sequence.uintAt(publicExponentRange);
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            revert(_errorMap[errorCode]);
+            return (5, "");
         }
+
+        return (0, abi.encode(modulus, publicExponent));
     }
 }

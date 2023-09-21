@@ -2,7 +2,7 @@ const { loadFixture } = require('@nomicfoundation/hardhat-network-helpers');
 const { expect } = require('chai');
 const { ethers } = require('hardhat');
 
-const { getContractFactory } = ethers;
+const { getContractFactory, utils } = ethers;
 
 describe('DnsARecordResolver test', function () {
 
@@ -15,42 +15,48 @@ describe('DnsARecordResolver test', function () {
         return { dnsARecordResolver };
     }
 
-    function ipStringToUint8Array(ip) {
-        const uint8 = new Uint8Array(4);
-        ip.split('.').forEach((num, index) => {
-            num = Number(num);
-            if (num > 255 | num < 0) {
-                throw new Error('invalid ip address');
-            }
-            uint8[index] = num;
-        })
-        return uint8;
-    }
-
-    function ipUint8ArrayToString(uint8Array) {
-        let ip = '';
-        for (let item of uint8Array) {
-            ip += item.toString() + '.';
-        }
-        return ip.substring(0, ip.length - 1);
-    }
-
     it('can parse dns a records bytes', async function () {
         const { dnsARecordResolver } = await loadFixture(deployTokenFixture);
 
         let ips = [
-            '127.0.0.1',
-            '8.8.8.8',
-            '255.255.255.255',
-            '123.123.123.123'
+            [127, 0, 0, 1],
+            [8, 8, 8, 8],
+            [255, 255, 255, 255],
+            [123, 123, 123, 123]
         ]
 
         for (let ip of ips) {
-            let ipUint8 = ipStringToUint8Array(ip);
-            let ipBufferStr = '0x' + Buffer.from(ipUint8).toString('hex');
-            const ret = await dnsARecordResolver.parse(ipBufferStr);
-            const ipStr = ipUint8ArrayToString(ret);
-            expect(ipStr).to.equal(ip);
+            let ipBuffer = '0x' + Buffer.from(ip).toString('hex');
+            const isValid = await dnsARecordResolver.dnsARecordResolverValidate(ipBuffer);
+            expect(isValid).equal(0);
+
+            const [status, ipBytes] = await dnsARecordResolver.dnsARecordResolverParse(ipBuffer);
+            expect(status).equal(0);
+
+            const abiDecoder = new utils.AbiCoder();
+            const ipRet = abiDecoder.decode(["uint8[]"], ipBytes);
+            // deep equality
+            expect(ipRet[0]).to.eql(ip);
+        }
+    });
+
+    it('invalid ip format', async function () {
+        const { dnsARecordResolver } = await loadFixture(deployTokenFixture);
+
+        let ipBuffers = [
+            "0xffffff",
+            "0xffffffffff",
+            "0x1fffffffff",
+            "0x0000000001",
+        ]
+
+        for (let ipBuffer of ipBuffers) {
+            const isValid = await dnsARecordResolver.dnsARecordResolverValidate(ipBuffer);
+            expect(isValid).equal(4);
+
+            const [status, ipBytes] = await dnsARecordResolver.dnsARecordResolverParse(ipBuffer);
+            expect(status).equal(4);
+            expect(ipBytes).equal("0x");
         }
     });
 });

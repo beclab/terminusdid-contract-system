@@ -7,17 +7,17 @@ The raw bytes data length must be 4
 */
 
 contract DnsARecordResolver {
-    function validate(bytes calldata data) public pure returns (bool) {
-        if (data.length != 4) return false;
-        return true;
+    function dnsARecordResolverValidate(bytes calldata data) public pure returns (uint256) {
+        if (data.length != 4) return 4;
+        return 0;
     }
 
-    function parse(bytes calldata data) public pure returns (uint8[] memory) {
-        require(data.length == 4, "bytes data length must be 4");
+    function dnsARecordResolverParse(bytes calldata data) public pure returns (uint256, bytes memory) {
+        if (data.length != 4) return (4, "");
         uint8[] memory ip = new uint8[](4);
         for (uint256 index; index < 4; index++) {
             ip[index] = uint8(data[index]);
         }
-        return ip;
+        return (0, abi.encode(ip));
     }
 }
