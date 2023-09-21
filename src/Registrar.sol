@@ -27,7 +27,7 @@ contract Registrar is Context, Ownable2Step {
 
     error UnsupportedTagKey(bytes8 key);
 
-    error IrregularTagValue();
+    error InvalidTagValue();
 
     constructor(address registry_, address resolver_) {
         _registry = TerminusDID(registry_);
@@ -68,31 +68,30 @@ contract Registrar is Context, Ownable2Step {
     }
 
     function setTag(string calldata domain, bytes8 key, bytes calldata value) public returns (bool addedOrRemoved) {
+        DomainUtils.Slice[] memory levels = domain.traceLevels();
+
         address caller = _msgSender();
-        if (!(caller == owner() || _registry.allowSetTag(_msgSender(), domain, key))) {
+        if (!(caller == owner() || _registry.allowSetTag(_msgSender(), levels, key))) {
             revert Unauthorized();
         }
 
-        DomainUtils.Slice[] memory levels = domain.traceLevels();
-
         address levelResolver = address(_resolver);
-        for (uint256 i = levels.length - 1;;) {
-            if (levelResolver == address(0)) {
-                continue;
-            }
-            try IResolver(levelResolver).validate(key, value) returns (uint256 status) {
-                if (status == 0) {
-                    return _registry.setTag(domain.tokenId(), key, value);
-                } else if (status > 1) {
-                    revert IrregularTagValue();
+        for (uint256 i = levels.length;;) {
+            if (levelResolver != address(0)) {
+                try IResolver(levelResolver).validate(key, value) returns (uint256 status) {
+                    if (status == 0) {
+                        return _registry.setTag(domain.tokenId(), key, value);
+                    } else if (status > 1) {
+                        revert InvalidTagValue();
+                    }
+                } catch {
+                    revert BadResolver(levelResolver);
                 }
-            } catch {
-                revert BadResolver(levelResolver);
             }
             if (i == 0) {
                 break;
             }
-            levelResolver = _getResolver(levels[i].tokenId());
+            levelResolver = _getResolver(levels[--i].tokenId());
         }
 
         revert UnsupportedTagKey(key);
