@@ -9,8 +9,11 @@ import {IERC721Metadata} from "@openzeppelin/contracts/token/ERC721/extensions/I
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 import {IERC721EnumerableErrors} from "./IERC721EnumerableErrors.sol";
+import {DomainUtils} from "./utils/DomainUtils.sol";
 
 contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Metadata, IERC721EnumerableErrors {
+    using DomainUtils for string;
+
     enum Kind {
         Unknown,
         Person,
@@ -114,7 +117,7 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
         if (kind == Kind.Unknown) {
             revert InvalidKind();
         }
-        tokenId = uint256(keccak256(bytes(domain)));
+        tokenId = domain.tokenId();
         if (_ownerOf(tokenId) != address(0)) {
             revert TokenExists();
         }
@@ -270,6 +273,9 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
         }
 
         if (to == address(0)) {
+            // burning a token without burning its children results in invariance broken
+            // TODO: perfect the logics as needed in the future
+            assert(false);
             uint256 srcIndex = _tokens.length - 1;
             uint40 dstIndex = node.index;
             if (srcIndex != dstIndex) {

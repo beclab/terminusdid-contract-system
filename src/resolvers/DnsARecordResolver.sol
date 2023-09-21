@@ -15,7 +15,7 @@ contract DnsARecordResolver {
     function parse(bytes calldata data) public pure returns (uint8[] memory) {
         require(data.length == 4, "bytes data length must be 4");
         uint8[] memory ip = new uint8[](4);
-        for (uint index; index<4; index++) {
+        for (uint256 index; index < 4; index++) {
             ip[index] = uint8(data[index]);
         }
         return ip;

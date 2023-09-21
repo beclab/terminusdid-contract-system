@@ -4,7 +4,7 @@ pragma solidity ^0.8.18;
 import {Test} from "forge-std/Test.sol";
 import {TerminusDID} from "../src/TerminusDID.sol";
 import {IERC721EnumerableErrors} from "../src/IERC721EnumerableErrors.sol";
-import {ERC721Receiver, ERC721InvalidReceiver} from "./Mock/ERC721Receiver.sol";
+import {ERC721Receiver, ERC721InvalidReceiver} from "./mocks/ERC721Receiver.sol";
 
 contract TerminusDIDTest is Test {
     TerminusDID public terminusDID;
