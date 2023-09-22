@@ -27,7 +27,7 @@ contract Registrar is Context, Ownable2Step {
 
     error UnsupportedTagKey(bytes8 key);
 
-    error InvalidTagValue();
+    error InvalidTagValue(uint256 errorCode, address resolver);
 
     constructor(address registry_, address resolver_) {
         _registry = TerminusDID(registry_);
@@ -82,7 +82,7 @@ contract Registrar is Context, Ownable2Step {
                     if (status == 0) {
                         return _registry.setTag(domain.tokenId(), key, value);
                     } else if (status > 1) {
-                        revert InvalidTagValue();
+                        revert InvalidTagValue(status, levelResolver);
                     }
                 } catch {
                     revert BadResolver(levelResolver);

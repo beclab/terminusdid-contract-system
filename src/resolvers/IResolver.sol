@@ -13,7 +13,7 @@ interface IResolver {
      * @return status Validation result code:
      *                - Passed(0),
      *                - KeyRejected(1),
-     *                - KeyReservedButNotImplemented(2),
+     *                - KeyReservedButUnimplemented(2),
      *                - ValueInvalid(otherwise).
      */
     function validate(bytes8 key, bytes calldata value) external view returns (uint256 status);
@@ -31,6 +31,7 @@ interface IResolverWithParse is IResolver {
      *
      * @return status MUST be the same as returned by `validate(key, value)`.
      * @return parsed Parsed ABI-encoded value in bytes. Typical use: `abi.decode(parsed, (...))`.
+     *                SHOULD be empty if `status` is nonzero.
      */
     function parse(bytes8 key, bytes calldata value) external view returns (uint256 status, bytes memory parsed);
 }
