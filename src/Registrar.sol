@@ -21,9 +21,9 @@ contract Registrar is Context, Ownable2Step {
 
     error Unauthorized();
 
-    error InvalidSubdomain();
-
     error InvalidParentKind();
+
+    error InvalidDomainString();
 
     error BadResolver(address resolver);
 
@@ -52,6 +52,13 @@ contract Registrar is Context, Ownable2Step {
         _resolver = IResolver(resolver_);
     }
 
+    function registerTLD(string calldata tld, address tokenOwner) public onlyOwner returns (uint256 tokenId) {
+        if (!tld.isValidSubdomain()) {
+            revert InvalidDomainString();
+        }
+        return _registry.register(tld, "", tokenOwner, TerminusDID.Kind.Organization);
+    }
+
     function register(
         string calldata subdomain,
         string calldata parentDomain,
@@ -60,14 +67,14 @@ contract Registrar is Context, Ownable2Step {
         TerminusDID.Kind kind
     ) public returns (uint256 tokenId) {
         address caller = _msgSender();
-        if (!(caller == owner() || _registry.allowRegister(caller, parentDomain))) {
+        if (!(_registry.allowRegister(caller, parentDomain) || caller == owner())) {
             revert Unauthorized();
         }
         if (_registry.getKind(parentDomain.tokenId()) != TerminusDID.Kind.Organization) {
             revert InvalidParentKind();
         }
         if (!subdomain.isValidSubdomain()) {
-            revert InvalidSubdomain();
+            revert InvalidDomainString();
         }
         return _registry.register(string.concat(subdomain, ".", parentDomain), did, tokenOwner, kind);
     }
