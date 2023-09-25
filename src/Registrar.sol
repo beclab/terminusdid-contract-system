@@ -23,6 +23,8 @@ contract Registrar is Context, Ownable2Step {
 
     error InvalidSubdomain();
 
+    error InvalidParentKind();
+
     error BadResolver(address resolver);
 
     error UnsupportedTagKey(bytes8 key);
@@ -60,6 +62,9 @@ contract Registrar is Context, Ownable2Step {
         address caller = _msgSender();
         if (!(caller == owner() || _registry.allowRegister(caller, parentDomain))) {
             revert Unauthorized();
+        }
+        if (_registry.getKind(parentDomain.tokenId()) != TerminusDID.Kind.Organization) {
+            revert InvalidParentKind();
         }
         if (!subdomain.isValidSubdomain()) {
             revert InvalidSubdomain();

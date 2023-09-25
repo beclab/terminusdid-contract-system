@@ -93,6 +93,10 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
         return (node.domain, node.did, node.owner, node.kind);
     }
 
+    function getKind(uint256 tokenId) public view returns (Kind kind) {
+        return _nodes[tokenId].kind;
+    }
+
     function getTagValue(uint256 tokenId, bytes8 key) public view returns (bool exists, bytes memory value) {
         (exists,, value) = _getTag(_tags[tokenId], key);
     }
