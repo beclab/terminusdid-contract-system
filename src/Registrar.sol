@@ -52,11 +52,15 @@ contract Registrar is Context, Ownable2Step {
         _resolver = IResolver(resolver_);
     }
 
-    function registerTLD(string calldata tld, address tokenOwner) public onlyOwner returns (uint256 tokenId) {
+    function registerTLD(string calldata tld, string calldata did, address tokenOwner)
+        public
+        onlyOwner
+        returns (uint256 tokenId)
+    {
         if (!tld.isValidSubdomain()) {
             revert InvalidDomainString();
         }
-        return _registry.register(tld, "", tokenOwner, TerminusDID.Kind.Organization);
+        return _registry.register(tld, did, tokenOwner, TerminusDID.Kind.Organization);
     }
 
     function register(
