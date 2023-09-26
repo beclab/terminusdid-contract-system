@@ -3,12 +3,17 @@ pragma solidity 0.8.21;
 
 import {Test} from "forge-std/Test.sol";
 import {PublicResolver} from "../../src/resolvers/PublicResolver.sol";
+import {CustomResolver} from "../../src/resolvers/examples/CustomResolver.sol";
+import {EmptyContract} from "../mocks/EmptyContract.sol";
+import {InvalidCustomResolver} from "../mocks/InvalidCustomResolver.sol";
 
 contract TerminusDIDTest is Test {
     PublicResolver public publicResolver;
+    CustomResolver public customResolver;
 
     function setUp() public {
         publicResolver = new PublicResolver();
+        customResolver = new CustomResolver();
     }
 
     function testKeyGTPublicResolverLimit() public {
@@ -84,5 +89,47 @@ contract TerminusDIDTest is Test {
         value = hex"0011223344";
         status = publicResolver.validate(key, value);
         assertEq(status, 4);
+    }
+
+    function testValiateCustomResolverAddress() public {
+        bytes8 key = bytes8(uint64(0x97));
+        bytes memory value = abi.encodePacked(address(customResolver));
+
+        uint256 status;
+        status = publicResolver.validate(key, value);
+        assertEq(status, 0);
+    }
+
+    function testValiateWrongCustomResolver() public {
+        bytes8 key = bytes8(uint64(0x97));
+        bytes memory value;
+        uint256 status;
+
+        // wrong address length
+        value = hex"123456";
+        status = publicResolver.validate(key, value);
+        assertEq(status, 6);
+
+        // custom address is a empty contract
+        EmptyContract emptyContract = new EmptyContract();
+        value = abi.encodePacked(address(emptyContract));
+        status = publicResolver.validate(key, value);
+        assertEq(status, 7);
+
+        // custom address is a invalid customer resolver
+        InvalidCustomResolver invalidCustomResolver = new InvalidCustomResolver();
+        value = abi.encodePacked(address(invalidCustomResolver));
+        status = publicResolver.validate(key, value);
+        assertEq(status, 8);
+    }
+
+    function testParseCustomResolverAddress() public {
+        bytes8 key = bytes8(uint64(0x97));
+        bytes memory value = abi.encodePacked(address(customResolver));
+
+        (uint256 status, bytes memory value_) = publicResolver.parse(key, value);
+        address valueParsed = abi.decode(value_, (address));
+        assertEq(status, 0);
+        assertEq(address(customResolver), valueParsed);
     }
 }
