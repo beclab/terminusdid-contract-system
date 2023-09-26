@@ -23,7 +23,7 @@ contract Registrar is Context, Ownable2Step {
 
     error InvalidParentKind();
 
-    error InvalidDomainString();
+    error InvalidDomainLabel();
 
     error BadResolver(address resolver);
 
@@ -57,14 +57,14 @@ contract Registrar is Context, Ownable2Step {
         onlyOwner
         returns (uint256 tokenId)
     {
-        if (!tld.isValidSubdomain()) {
-            revert InvalidDomainString();
+        if (!tld.isValidLabel()) {
+            revert InvalidDomainLabel();
         }
         return _registry.register(tld, did, tokenOwner, TerminusDID.Kind.Organization);
     }
 
     function register(
-        string calldata subdomain,
+        string calldata label,
         string calldata parentDomain,
         string calldata did,
         address tokenOwner,
@@ -77,10 +77,10 @@ contract Registrar is Context, Ownable2Step {
         if (_registry.getKind(parentDomain.tokenId()) != TerminusDID.Kind.Organization) {
             revert InvalidParentKind();
         }
-        if (!subdomain.isValidSubdomain()) {
-            revert InvalidDomainString();
+        if (!label.isValidLabel()) {
+            revert InvalidDomainLabel();
         }
-        return _registry.register(string.concat(subdomain, ".", parentDomain), did, tokenOwner, kind);
+        return _registry.register(string.concat(label, ".", parentDomain), did, tokenOwner, kind);
     }
 
     function setTag(string calldata domain, bytes8 key, bytes calldata value) public returns (bool addedOrRemoved) {
