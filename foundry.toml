@@ -4,4 +4,12 @@ out = "out"
 libs = ["lib"]
 solc_version = "0.8.21"
 
+[rpc_endpoints]
+op_goerli = "${OP_GOERLI_RPC_URL}"
+goerli = "${GOERLI_RPC_URL}"
+
+[etherscan]
+op_goerli = { key = "${OP_API_KEY}", url = "https://goerli-optimism.etherscan.io/" }
+goerli = { key = "${API_KEY}" }
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
