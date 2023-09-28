@@ -112,6 +112,46 @@ contract RegistrarTest is Test {
         assertEq(uint8(kind_), uint8(kind));
     }
 
+    function testRegisterVeryLongDomainName() public {
+        string memory tld = "com";
+        address comOwner = address(100);
+        string memory did = "did";
+        registrar.registerTLD(tld, did, comOwner);
+
+        address testOwner = address(200);
+        TerminusDID.Kind kind = TerminusDID.Kind.Organization;
+
+        string memory parentDomain = tld;
+        string memory subdomain1 =
+            "BfvuSqXzxYOugu4ItmHF420hxvMh7ZUpCTu5nXxBPsylY0aob716jIeMO8qAlDmsFIEXdgfxsoyDr1zwtl8YQ6JS2AMZN1ByjCa6";
+        vm.prank(comOwner);
+        registrar.register(subdomain1, parentDomain, did, testOwner, kind);
+
+        parentDomain = string.concat(subdomain1, ".", parentDomain);
+        string memory subdomain2 =
+            "ArOpJeAQhTcj8CORVbPWiGIAHfNNF0jVxLWncUIybZkBcXycLcWyNEHHxgH1Vuq9r1aOanZbUyg7EbWvUY9mCob99nAZNQMK7eCoXkwJXZffvzS68Cpw3CbALSjkqY8zBx6uAhZpsBQISnFUMoVLpadGmhutOPfHB8z9V7xyXIrR0tjTmSF2SGUqCqgJZAhF1a3pcd8X";
+        vm.prank(comOwner);
+        registrar.register(subdomain2, parentDomain, did, testOwner, kind);
+
+        parentDomain = string.concat(subdomain2, ".", parentDomain);
+        string memory subdomain3 =
+            "aGg8fVMdCq5Crcobxw1pCF6Msn90yOuF00ZCzAeNLQ8NlNDHqp3jTJ2gxsGfJFbJQagB1jHuwpZDQAzXmRdEaATgEAUCjzdrXwIxBFC58QuOHo8F6qR5dwF0HwQTmiVi30Yvqx9B2LbXEiiSEhAIzCLrZBaApBY3u9YlxRQfGH0hMgcKfX4RnkbIAECPgbmd4rUiKd1uec0TrKL585lAIfE40uzMoDoFvt1RTPiV9FBv8djg1cUI9Zt9OoXgjQwGkVaPwsGnfcYFzbzjFstpj5cFc4gqkNTw3JSyltFR7LEn";
+        vm.prank(comOwner);
+        registrar.register(subdomain3, parentDomain, did, testOwner, kind);
+
+        parentDomain = string.concat(subdomain3, ".", parentDomain);
+        string memory subdomain4 =
+            "dNEfHKqaXMp4MTovSt4D8osxq4oA2dv9C77AkHVoU2id2EuJp5AyQK5ghk2JMbWPdfP6O1r6KzyqQq8CqqLZk7GctJDhFz2dnBkQ8T9rQSTxlKhnyHucU3rIdgR9hgwQ8ucgz1bW0tBNFRm1Flnmw17KAyxtsmLALeuVltV4cuRL17pRfrgUO1FoAphRQiYYMKr50TZkqLSZiRfL9f8UXkCKUsy6yFcTJglOJyBJ63S1ib9dasBBPSbgn0108TN7SUJWhxVO71Hu0FFAeANTWNVPb0SVnormPxuQ9miTsX3pZdKxRaz5sEnQXncSJzEzryIpbcmdSfnnDzTpHfHwJlDI6YNDwYK17mmUtSqFibKhIwV9NXNRJDNI3h8bxYdAnwXhCdBDPPLTl4LI";
+        vm.prank(comOwner);
+        registrar.register(subdomain4, parentDomain, did, testOwner, kind);
+
+        parentDomain = string.concat(subdomain4, ".", parentDomain);
+        string memory subdomain5 =
+            "7dIeu4gqYMz7JerElyQ2KaUqRe0NNfncGQsE6uYu9snVYaVRvDLobZpfdYpKP1Zy5kgwtQ2HwzgguNh7GoOc2KiThbWuOkyUaP2Vt9lBesfLNy4VB5hK8W0wK8NbTkD6FDxdpEAr9KlBpiBWSxnZB3VWyTSeillM94NmIo4MZ3a7GldgAqXM33cOFeMOq7BmDNHJRRoBlCkgjSEiN8fIK0KyhZYMND8GS1gwrdSwZCCLubPCqwidPh7UBCToRYhkLDctoUiYaEoNLUkbK487RqDVRPc1cqSCuVTA4dERnbdvNjy6dhk5ylvdYG9PgP2dNYYdpg6A8ro2V4g7jN0IP69zQn7qhI2exTGUZwCaaA5iwchMf0BbV9MOlzhwz1VWubbkrToP0F1AAXoYCLVo5XsUcWcN5SQutMXAipE6fejNR3niNFgsCmnZojat0BWYCbZ8zDjPV7wHVTo64lTJ3u3Lobk012tG9IDcLvrdzTKzLJ2Phxv9";
+        vm.prank(comOwner);
+        registrar.register(subdomain5, parentDomain, did, testOwner, kind);
+    }
+
     function testRegisterChainDomains() public {
         address aOwner = address(100);
         string memory did = "did";
