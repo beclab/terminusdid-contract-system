@@ -10,14 +10,14 @@ contract DeployScript is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address domainOwner = vm.envAddress("SNOWINNING_COM_OWNER");
+        string memory _name = vm.envString("TERMINUSDID_NAME");
+        string memory _symbol = vm.envString("TERMINUSDID_SYMBOL");
 
         vm.startBroadcast(deployerPrivateKey);
 
         PublicResolver resolver = new PublicResolver();
         Registrar registrar = new Registrar(address(0), address(resolver));
 
-        string memory _name = "TestTerminusDID";
-        string memory _symbol = "TTDID";
         TerminusDID registry = new TerminusDID(_name, _symbol, address(registrar));
         registrar.setRegistry(address(registry));
 
