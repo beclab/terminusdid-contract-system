@@ -17,23 +17,23 @@ contract TerminusDIDTest is Test {
     }
 
     function testKeyGTPublicResolverLimit() public {
-        uint64 _PUBLIC_KEY_LIMIT = uint64(type(uint16).max);
-        uint64 keyNum = uint64(0x1234567);
+        uint32 _PUBLIC_KEY_LIMIT = uint32(type(uint16).max);
+        uint32 keyNum = 0x1234567;
         assertGt(keyNum, _PUBLIC_KEY_LIMIT);
 
-        uint256 status = publicResolver.validate(bytes8(keyNum), "");
+        uint256 status = publicResolver.validate(keyNum, "");
         assertEq(status, 1);
     }
 
     function testKeyNotImplYet() public {
-        uint64 keyNum = uint64(0x7342);
+        uint32 keyNum = 0x7342;
 
-        uint256 status = publicResolver.validate(bytes8(keyNum), "");
+        uint256 status = publicResolver.validate(keyNum, "");
         assertEq(status, 2);
     }
 
     function testValidateRsaPubKey() public {
-        bytes8 key = bytes8(uint64(0x12));
+        uint32 key = 0x12;
         bytes memory value =
             hex"3082010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001";
 
@@ -42,7 +42,7 @@ contract TerminusDIDTest is Test {
     }
 
     function testParseRsaPubKey() public {
-        bytes8 key = bytes8(uint64(0x12));
+        uint32 key = 0x12;
         bytes memory value =
             hex"3082010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001";
 
@@ -58,7 +58,7 @@ contract TerminusDIDTest is Test {
     }
 
     function testInvalidRsaPubKey() public {
-        bytes8 key = bytes8(uint64(0x12));
+        uint32 key = 0x12;
         bytes memory value =
             hex"3182010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001";
 
@@ -67,7 +67,7 @@ contract TerminusDIDTest is Test {
     }
 
     function testValidateAndParseIpARecord() public {
-        bytes8 key = bytes8(uint64(0x13));
+        uint32 key = 0x13;
         bytes memory value;
         value = hex"ffffffff";
 
@@ -92,7 +92,7 @@ contract TerminusDIDTest is Test {
     }
 
     function testValiateCustomResolverAddress() public {
-        bytes8 key = bytes8(uint64(0x97));
+        uint32 key = 0x97;
         bytes memory value = abi.encodePacked(address(customResolver));
 
         uint256 status;
@@ -101,7 +101,7 @@ contract TerminusDIDTest is Test {
     }
 
     function testValiateWrongCustomResolver() public {
-        bytes8 key = bytes8(uint64(0x97));
+        uint32 key = 0x97;
         bytes memory value;
         uint256 status;
 
@@ -124,7 +124,7 @@ contract TerminusDIDTest is Test {
     }
 
     function testParseCustomResolverAddress() public {
-        bytes8 key = bytes8(uint64(0x97));
+        uint32 key = 0x97;
         bytes memory value = abi.encodePacked(address(customResolver));
 
         (uint256 status, bytes memory value_) = publicResolver.parse(key, value);

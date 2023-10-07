@@ -244,7 +244,7 @@ contract RegistrarTest is Test {
         string memory did = "did";
         registrar.registerTLD(domain, did, aOwner);
 
-        bytes8 key = bytes8(uint64(0x12));
+        uint32 key = 0x12;
         bytes memory value =
             hex"3082010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001";
 
@@ -260,7 +260,7 @@ contract RegistrarTest is Test {
 
     function testSetTagForMultiLevels() public {
         // set domian DNS A Record
-        bytes8 key = bytes8(uint64(0x13));
+        uint32 key = 0x13;
         bytes memory value = hex"c0a80101";
         string memory did = "did";
 
@@ -295,7 +295,7 @@ contract RegistrarTest is Test {
 
         // ancestor domain owner can set tags for child subdomains
         vm.prank(aOwner);
-        bytes8 key2 = bytes8(uint64(0x12));
+        uint32 key2 = 0x12;
         bytes memory value2 =
             hex"3082010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001";
 
@@ -309,7 +309,7 @@ contract RegistrarTest is Test {
     }
 
     function testSetTagUnauthorized() public {
-        bytes8 key = bytes8(uint64(0x13));
+        uint32 key = 0x13;
         bytes memory value = hex"c0a80101";
         string memory did = "did";
 
@@ -323,7 +323,7 @@ contract RegistrarTest is Test {
     }
 
     function testSetTagNotInOrder() public {
-        bytes8 key = bytes8(uint64(0x13));
+        uint32 key = 0x13;
         bytes memory value = hex"c0a80101";
         string memory did = "did";
 
@@ -336,7 +336,7 @@ contract RegistrarTest is Test {
     }
 
     function testSetTagNotValidValue() public {
-        bytes8 key = bytes8(uint64(0x13));
+        uint32 key = 0x13;
         bytes memory value = hex"c0a8010101";
         string memory did = "did";
 
@@ -349,7 +349,7 @@ contract RegistrarTest is Test {
     }
 
     function testSetTagNotValidKey() public {
-        bytes8 key = bytes8(uint64(0x1300000000));
+        uint32 key = 0x13000000;
         bytes memory value = hex"c0a80101";
         string memory did = "did";
 
@@ -367,11 +367,11 @@ contract RegistrarTest is Test {
         string memory domain = "a";
         registrar.registerTLD(domain, did, aOwner);
 
-        bytes8 key;
+        uint32 key;
         bytes memory value;
 
         CustomResolver customResolver = new CustomResolver();
-        key = bytes8(uint64(0x97));
+        key = 0x97;
         value = abi.encodePacked(address(customResolver));
         vm.prank(aOwner);
         registrar.setTag(domain, key, value);
@@ -383,7 +383,7 @@ contract RegistrarTest is Test {
         assertEq(address(customResolver), address(bytes20(dataRet)));
 
         // use custom resolver to store string and the key in custom resolver should bigger than 0xffff
-        key = bytes8(uint64(0xffff01));
+        key = 0xffff01;
         value = bytes(unicode"君不见黄河之水天上来，奔流到海不复回。君不见高堂明镜悲白发，朝如青丝暮成雪");
         vm.prank(aOwner);
         registrar.setTag(domain, key, value);
@@ -399,18 +399,18 @@ contract RegistrarTest is Test {
         string memory domain = "a";
         registrar.registerTLD(domain, did, aOwner);
 
-        bytes8 key;
+        uint32 key;
         bytes memory value;
 
         EmptyContract emptyContract = new EmptyContract();
-        key = bytes8(uint64(0x97));
+        key = 0x97;
         value = abi.encodePacked(address(emptyContract));
         vm.prank(aOwner);
         vm.expectRevert(abi.encodeWithSelector(Registrar.InvalidTagValue.selector, 7, address(resolver)));
         registrar.setTag(domain, key, value);
 
         InvalidCustomResolver invalidCustomResolver = new InvalidCustomResolver();
-        key = bytes8(uint64(0x97));
+        key = 0x97;
         value = abi.encodePacked(address(invalidCustomResolver));
         vm.prank(aOwner);
         vm.expectRevert(abi.encodeWithSelector(Registrar.InvalidTagValue.selector, 8, address(resolver)));

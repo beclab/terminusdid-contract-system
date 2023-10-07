@@ -108,8 +108,7 @@ contract TerminusDIDTest is Test {
         address owner = address(100);
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
-        string memory keyStr = "nickname";
-        bytes8 key = bytes8(keccak256(bytes(keyStr)));
+        uint32 key = 0x100;
 
         string memory valueStr = "elephant";
         bytes memory value = bytes(valueStr);
@@ -120,7 +119,7 @@ contract TerminusDIDTest is Test {
         uint256 tagCount = terminusDID.getTagCount(tokenId);
         assertEq(tagCount, 1);
 
-        bytes8[] memory tags = terminusDID.getTagKeys(tokenId);
+        uint32[] memory tags = terminusDID.getTagKeys(tokenId);
         assertEq(tags.length, 1);
         assertEq(tags[0], key);
 
@@ -137,8 +136,7 @@ contract TerminusDIDTest is Test {
         address owner = address(100);
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
-        string memory keyStr = "nickname";
-        bytes8 key = bytes8(keccak256(bytes(keyStr)));
+        uint32 key = 0x100;
 
         bool addedOrRemoved = terminusDID.setTag(tokenId, key, "");
         assertEq(addedOrRemoved, false);
@@ -158,8 +156,7 @@ contract TerminusDIDTest is Test {
         address owner = address(100);
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
-        string memory keyStr = "nickname";
-        bytes8 key = bytes8(keccak256(bytes(keyStr)));
+        uint32 key = 0x100;
 
         string memory valueStr = "elephant";
         bytes memory value = bytes(valueStr);
@@ -188,8 +185,7 @@ contract TerminusDIDTest is Test {
         address owner = address(100);
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
-        string memory keyStr = "nickname";
-        bytes8 key = bytes8(keccak256(bytes(keyStr)));
+        uint32 key = 0x100;
 
         string memory valueStr = "elephant";
         bytes memory value = bytes(valueStr);
@@ -197,7 +193,7 @@ contract TerminusDIDTest is Test {
         bool addedOrRemoved;
         addedOrRemoved = terminusDID.setTag(tokenId, key, value);
         assertEq(addedOrRemoved, true);
-        bytes8[] memory keys;
+        uint32[] memory keys;
         keys = terminusDID.getTagKeys(tokenId);
         assertEq(keys.length, 1);
 
@@ -220,19 +216,19 @@ contract TerminusDIDTest is Test {
         address owner = address(100);
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
-        terminusDID.setTag(tokenId, bytes8(keccak256(bytes("country"))), bytes("CN"));
-        terminusDID.setTag(tokenId, bytes8(keccak256(bytes("gender"))), bytes("M"));
-        terminusDID.setTag(tokenId, bytes8(keccak256(bytes("city"))), bytes("beijing"));
-        terminusDID.setTag(tokenId, bytes8(keccak256(bytes("district"))), bytes("haidian"));
+        terminusDID.setTag(tokenId, 0x100, bytes("CN"));
+        terminusDID.setTag(tokenId, 0x101, bytes("M"));
+        terminusDID.setTag(tokenId, 0x102, bytes("beijing"));
+        terminusDID.setTag(tokenId, 0x103, bytes("haidian"));
 
-        terminusDID.setTag(tokenId, bytes8(keccak256(bytes("gender"))), "");
-        bytes8[] memory keys = terminusDID.getTagKeys(tokenId);
+        terminusDID.setTag(tokenId, 0x101, "");
+        uint32[] memory keys = terminusDID.getTagKeys(tokenId);
         assertEq(keys.length, 3);
         for (uint256 index; index < keys.length; index++) {
-            assertNotEq(keys[index], bytes8(keccak256(bytes("gender"))));
+            assertNotEq(keys[index], 0x101);
         }
 
-        (bool exists, bytes memory value) = terminusDID.getTagValue(tokenId, bytes8(keccak256(bytes("gender"))));
+        (bool exists, bytes memory value) = terminusDID.getTagValue(tokenId, 0x101);
         assertEq(exists, false);
         assertEq(value, "");
     }

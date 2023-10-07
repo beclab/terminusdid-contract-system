@@ -7,10 +7,10 @@ import {DnsARecordResolver} from "./DnsARecordResolver.sol";
 import {CustomResolverAddressResolver} from "./CustomResolverAddressResolver.sol";
 
 contract PublicResolver is IResolverWithParse, RsaPubKeyResolver, DnsARecordResolver, CustomResolverAddressResolver {
-    uint64 private constant _PUBLIC_KEY_LIMIT = uint64(uint64(0xffff));
-    bytes8 private constant _RSA_PUBKEY_RESOLVER = bytes8(uint64(0x12));
-    bytes8 private constant _DNS_A_RECORD_RESOLVER = bytes8(uint64(0x13));
-    bytes8 private constant _CUSTOM_RESOLVER = bytes8(uint64(0x97));
+    uint32 private constant _PUBLIC_KEY_LIMIT = 0xffff;
+    uint32 private constant _RSA_PUBKEY_RESOLVER = 0x12;
+    uint32 private constant _DNS_A_RECORD_RESOLVER = 0x13;
+    uint32 private constant _CUSTOM_RESOLVER = 0x97;
 
     /**
      * @return status
@@ -23,8 +23,8 @@ contract PublicResolver is IResolverWithParse, RsaPubKeyResolver, DnsARecordReso
      *     7: CustomResolverAddressResolver: customResolver has no validate method
      *     8: CustomResolverAddressResolver: customResolver is not allow to implement key within 0xffff
      */
-    function validate(bytes8 key, bytes calldata value) external view returns (uint256 status) {
-        if (uint64(key) > _PUBLIC_KEY_LIMIT) {
+    function validate(uint32 key, bytes calldata value) external view returns (uint256 status) {
+        if (key > _PUBLIC_KEY_LIMIT) {
             return 1;
         }
 
@@ -43,8 +43,8 @@ contract PublicResolver is IResolverWithParse, RsaPubKeyResolver, DnsARecordReso
         return 2;
     }
 
-    function parse(bytes8 key, bytes calldata value) external view returns (uint256 status, bytes memory parsed) {
-        if (uint64(key) > _PUBLIC_KEY_LIMIT) {
+    function parse(uint32 key, bytes calldata value) external view returns (uint256 status, bytes memory parsed) {
+        if (key > _PUBLIC_KEY_LIMIT) {
             return (1, "");
         }
 
