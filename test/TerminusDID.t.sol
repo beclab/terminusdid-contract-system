@@ -108,7 +108,7 @@ contract TerminusDIDTest is Test {
         address owner = address(100);
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
-        uint32 key = 0x100;
+        uint256 key = 0x100;
 
         string memory valueStr = "elephant";
         bytes memory value = bytes(valueStr);
@@ -119,7 +119,7 @@ contract TerminusDIDTest is Test {
         uint256 tagCount = terminusDID.getTagCount(tokenId);
         assertEq(tagCount, 1);
 
-        uint32[] memory tags = terminusDID.getTagKeys(tokenId);
+        uint256[] memory tags = terminusDID.getTagKeys(tokenId);
         assertEq(tags.length, 1);
         assertEq(tags[0], key);
 
@@ -136,7 +136,7 @@ contract TerminusDIDTest is Test {
         address owner = address(100);
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
-        uint32 key = 0x100;
+        uint256 key = 0x100;
 
         bool addedOrRemoved = terminusDID.setTag(tokenId, key, "");
         assertEq(addedOrRemoved, false);
@@ -149,6 +149,19 @@ contract TerminusDIDTest is Test {
         assertEq(valueFromContract, "");
     }
 
+    function testFuzzSetInvalidKey(uint256 kindNum) public {
+        kindNum = bound(kindNum, 1, 3);
+        TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
+
+        address owner = address(100);
+        uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
+
+        // maximum allowed key 0xffffffff
+        uint256 key = 0x100000000;
+        vm.expectRevert(abi.encodeWithSelector(TerminusDID.InvalidTagKey.selector));
+        terminusDID.setTag(tokenId, key, "value");
+    }
+
     function testFuzzModityTag(uint256 kindNum) public {
         kindNum = bound(kindNum, 1, 3);
         TerminusDID.Kind kind = TerminusDID.Kind(kindNum);
@@ -156,7 +169,7 @@ contract TerminusDIDTest is Test {
         address owner = address(100);
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
-        uint32 key = 0x100;
+        uint256 key = 0x100;
 
         string memory valueStr = "elephant";
         bytes memory value = bytes(valueStr);
@@ -185,7 +198,7 @@ contract TerminusDIDTest is Test {
         address owner = address(100);
         uint256 tokenId = terminusDID.register(_domain, _did, owner, kind);
 
-        uint32 key = 0x100;
+        uint256 key = 0x100;
 
         string memory valueStr = "elephant";
         bytes memory value = bytes(valueStr);
@@ -193,7 +206,7 @@ contract TerminusDIDTest is Test {
         bool addedOrRemoved;
         addedOrRemoved = terminusDID.setTag(tokenId, key, value);
         assertEq(addedOrRemoved, true);
-        uint32[] memory keys;
+        uint256[] memory keys;
         keys = terminusDID.getTagKeys(tokenId);
         assertEq(keys.length, 1);
 
@@ -222,7 +235,7 @@ contract TerminusDIDTest is Test {
         terminusDID.setTag(tokenId, 0x103, bytes("haidian"));
 
         terminusDID.setTag(tokenId, 0x101, "");
-        uint32[] memory keys = terminusDID.getTagKeys(tokenId);
+        uint256[] memory keys = terminusDID.getTagKeys(tokenId);
         assertEq(keys.length, 3);
         for (uint256 index; index < keys.length; index++) {
             assertNotEq(keys[index], 0x101);

@@ -11,7 +11,7 @@ contract CustomResolverAddressResolver {
     function customResolverAddressResolverValidate(bytes calldata data) public view returns (uint256) {
         if (data.length != 20) return 6;
         address customResolverAddress = address(uint160(bytes20(data)));
-        uint32 testKey = 0xffff;
+        uint256 testKey = 0xffff;
 
         (bool success, bytes memory returnData) =
             customResolverAddress.staticcall(abi.encodeWithSelector(IResolver.validate.selector, testKey, ""));

@@ -4,9 +4,9 @@ pragma solidity 0.8.21;
 import {IResolverWithParse} from "../../src/resolvers/IResolver.sol";
 
 contract InvalidCustomResolver is IResolverWithParse {
-    uint32 private constant _PUBLIC_KEY_LIMIT = 0xffff;
+    uint256 private constant _PUBLIC_KEY_LIMIT = 0xffff;
 
-    function validate(uint32 key, bytes calldata value) external pure returns (uint256 status) {
+    function validate(uint256 key, bytes calldata value) external pure returns (uint256 status) {
         if (key > _PUBLIC_KEY_LIMIT) {
             return 1;
         }
@@ -18,7 +18,7 @@ contract InvalidCustomResolver is IResolverWithParse {
         return 0;
     }
 
-    function parse(uint32 key, bytes calldata value) external pure returns (uint256 status, bytes memory parsed) {
+    function parse(uint256 key, bytes calldata value) external pure returns (uint256 status, bytes memory parsed) {
         if (key > _PUBLIC_KEY_LIMIT) {
             return (1, "");
         }
