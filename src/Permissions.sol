@@ -10,13 +10,13 @@ library Permissions {
 
     using {_getOwner} for TerminusDID;
 
-    uint32 internal constant RESERVED_KEY_MAX = 0xffff;
+    uint256 internal constant RESERVED_KEY_MAX = 0xffff;
 
     bytes4 private constant _sigERC721NonexistentToken = bytes4(keccak256("ERC721NonexistentToken(uint256)"));
 
     error NonexistentDomain();
 
-    function allowSetTag(TerminusDID registry, address auth, uint256[] memory levels, uint32 key)
+    function allowSetTag(TerminusDID registry, address auth, uint256[] memory levels, uint256 key)
         internal
         view
         returns (bool)

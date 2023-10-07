@@ -33,7 +33,7 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
 
     struct TagGroup {
         uint32[] keys;
-        mapping(uint32 key => bytes value) values;
+        mapping(uint256 key => bytes value) values;
     }
 
     string private _name;
@@ -57,6 +57,8 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
     error TooManyTokens();
 
     error TooManyTags();
+
+    error InvalidTagKey();
 
     modifier onlyManager() {
         if (_msgSender() != _manager) {
@@ -84,6 +86,10 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
         return _manager;
     }
 
+    function tokenIdOf(string calldata domain) public pure returns (uint256) {
+        return domain.tokenId();
+    }
+
     function getMetaInfo(uint256 tokenId)
         public
         view
@@ -93,23 +99,26 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
         return (node.domain, node.did, node.owner, node.kind);
     }
 
-    function getKind(uint256 tokenId) public view returns (Kind kind) {
+    function getKind(uint256 tokenId) public view returns (Kind) {
         return _nodes[tokenId].kind;
     }
 
-    function getTagValue(uint256 tokenId, uint32 key) public view returns (bool exists, bytes memory value) {
+    function getTagValue(uint256 tokenId, uint256 key) public view returns (bool exists, bytes memory value) {
         (exists,, value) = _getTag(_tags[tokenId], key);
     }
 
-    function getTagKeys(uint256 tokenId) public view returns (uint32[] memory) {
-        return _tags[tokenId].keys;
+    function getTagKeys(uint256 tokenId) public view returns (uint256[] memory keys) {
+        uint32[] memory keysU32 = _tags[tokenId].keys;
+        assembly {
+            keys := keysU32
+        }
     }
 
     function getTagCount(uint256 tokenId) public view returns (uint256) {
         return _tags[tokenId].keys.length;
     }
 
-    function setTag(uint256 tokenId, uint32 key, bytes calldata value)
+    function setTag(uint256 tokenId, uint256 key, bytes calldata value)
         public
         onlyManager
         returns (bool addedOrRemoved)
@@ -338,7 +347,7 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
         delete tags.keys;
     }
 
-    function _getTag(TagGroup storage tags, uint32 key)
+    function _getTag(TagGroup storage tags, uint256 key)
         internal
         view
         returns (bool exists, uint16 index, bytes memory value)
@@ -354,7 +363,11 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
         }
     }
 
-    function _setTag(TagGroup storage tags, uint32 key, bytes memory value) internal returns (bool addedOrRemoved) {
+    function _setTag(TagGroup storage tags, uint256 key, bytes memory value) internal returns (bool addedOrRemoved) {
+        if (key > type(uint32).max) {
+            revert InvalidTagKey();
+        }
+
         (bool exists, uint16 index,) = _getTag(tags, key);
         if (value.length == 0) {
             if (exists) {
@@ -379,7 +392,7 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
                 revert TooManyTags();
             }
             index = uint16(nextIndex);
-            tags.keys.push(key);
+            tags.keys.push(uint32(key));
             addedOrRemoved = true;
         }
         tags.values[key] = bytes.concat(value, bytes2(index));

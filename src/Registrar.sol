@@ -17,7 +17,7 @@ contract Registrar is Context, Ownable2Step {
     TerminusDID private _registry;
     IResolver private _resolver;
 
-    uint32 private constant _TAGKEY_CUSTOM_RESOLVER = 0x97;
+    uint256 private constant _TAGKEY_CUSTOM_RESOLVER = 0x97;
 
     error Unauthorized();
 
@@ -27,7 +27,7 @@ contract Registrar is Context, Ownable2Step {
 
     error BadResolver(address resolver);
 
-    error UnsupportedTagKey(uint32 key);
+    error UnsupportedTagKey(uint256 key);
 
     error InvalidTagValue(uint256 errorCode, address resolver);
 
@@ -83,7 +83,7 @@ contract Registrar is Context, Ownable2Step {
         return _registry.register(string.concat(label, ".", parentDomain), did, tokenOwner, kind);
     }
 
-    function setTag(string calldata domain, uint32 key, bytes calldata value) public returns (bool addedOrRemoved) {
+    function setTag(string calldata domain, uint256 key, bytes calldata value) public returns (bool addedOrRemoved) {
         uint256[] memory levels = domain.allLevels();
 
         address caller = _msgSender();
