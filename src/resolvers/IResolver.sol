@@ -16,7 +16,7 @@ interface IResolver {
      *                - KeyReservedButUnimplemented(2),
      *                - ValueInvalid(otherwise).
      */
-    function validate(bytes8 key, bytes calldata value) external view returns (uint256 status);
+    function validate(uint32 key, bytes calldata value) external view returns (uint256 status);
 }
 
 // OPTIONAL: custom resolvers may freely choose whether or not to implement this extension.
@@ -33,5 +33,5 @@ interface IResolverWithParse is IResolver {
      * @return parsed Parsed ABI-encoded value in bytes. Typical use: `abi.decode(parsed, (...))`.
      *                SHOULD be empty if `status` is nonzero.
      */
-    function parse(bytes8 key, bytes calldata value) external view returns (uint256 status, bytes memory parsed);
+    function parse(uint32 key, bytes calldata value) external view returns (uint256 status, bytes memory parsed);
 }

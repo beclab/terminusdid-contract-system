@@ -32,8 +32,8 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
     }
 
     struct TagGroup {
-        bytes8[] keys;
-        mapping(bytes8 key => bytes value) values;
+        uint32[] keys;
+        mapping(uint32 key => bytes value) values;
     }
 
     string private _name;
@@ -97,11 +97,11 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
         return _nodes[tokenId].kind;
     }
 
-    function getTagValue(uint256 tokenId, bytes8 key) public view returns (bool exists, bytes memory value) {
+    function getTagValue(uint256 tokenId, uint32 key) public view returns (bool exists, bytes memory value) {
         (exists,, value) = _getTag(_tags[tokenId], key);
     }
 
-    function getTagKeys(uint256 tokenId) public view returns (bytes8[] memory) {
+    function getTagKeys(uint256 tokenId) public view returns (uint32[] memory) {
         return _tags[tokenId].keys;
     }
 
@@ -109,7 +109,7 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
         return _tags[tokenId].keys.length;
     }
 
-    function setTag(uint256 tokenId, bytes8 key, bytes calldata value)
+    function setTag(uint256 tokenId, uint32 key, bytes calldata value)
         public
         onlyManager
         returns (bool addedOrRemoved)
@@ -338,7 +338,7 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
         delete tags.keys;
     }
 
-    function _getTag(TagGroup storage tags, bytes8 key)
+    function _getTag(TagGroup storage tags, uint32 key)
         internal
         view
         returns (bool exists, uint16 index, bytes memory value)
@@ -354,13 +354,13 @@ contract TerminusDID is Context, ERC165, IERC721, IERC721Enumerable, IERC721Meta
         }
     }
 
-    function _setTag(TagGroup storage tags, bytes8 key, bytes memory value) internal returns (bool addedOrRemoved) {
+    function _setTag(TagGroup storage tags, uint32 key, bytes memory value) internal returns (bool addedOrRemoved) {
         (bool exists, uint16 index,) = _getTag(tags, key);
         if (value.length == 0) {
             if (exists) {
                 uint256 moveIndex = tags.keys.length - 1;
                 if (moveIndex != index) {
-                    bytes8 moveKey = tags.keys[moveIndex];
+                    uint32 moveKey = tags.keys[moveIndex];
                     tags.keys[index] = moveKey;
                     bytes storage moveValue = tags.values[moveKey];
                     uint256 lastByteIndex = moveValue.length - 1;
