@@ -32,11 +32,11 @@ contract DomainUtilsTest is Test {
 
     function testToString() public {
         uint256 slice = domain.asSlice();
-        assertEq0(bytes(domain), bytes(slice.toString()));
+        assertEq(domain, slice.toString());
 
         string memory domain2 = unicode"汤唯.中国";
         uint256 slice2 = domain2.asSlice();
-        assertEq0(bytes(domain2), bytes(slice2.toString()));
+        assertEq(domain2, slice2.toString());
     }
 
     function testParent() public {
@@ -44,30 +44,110 @@ contract DomainUtilsTest is Test {
         uint256 parentSlice = subDomain.parent();
         uint256 slice = domain.asSlice();
 
-        assertEq0(bytes(slice.toString()), bytes(parentSlice.toString()));
+        assertEq(slice.toString(), parentSlice.toString());
 
         string memory topDomain = "com";
         uint256 topDomainParent = topDomain.parent();
-        assertEq0(bytes(topDomainParent.toString()), "");
+        assertEq(topDomainParent.toString(), "");
+    }
+
+    function testSplit() public {
+        uint256 label;
+        uint256 parentDomain;
+        bool hasParent;
+        (label, parentDomain, hasParent) = domain.cut();
+        assertEq(true, hasParent);
+        assertEq("test", label.toString());
+        assertEq("com", parentDomain.toString());
+
+        string memory subDomain;
+        subDomain = "a.b.c.d.e.test.com";
+        (label, parentDomain, hasParent) = subDomain.cut();
+        assertEq(true, hasParent);
+        assertEq("a", label.toString());
+        assertEq("b.c.d.e.test.com", parentDomain.toString());
+
+        subDomain = "a..test.com";
+        (label, parentDomain, hasParent) = subDomain.cut();
+        assertEq(true, hasParent);
+        assertEq("a", label.toString());
+        assertEq(".test.com", parentDomain.toString());
+
+        subDomain = "a...test.com";
+        (label, parentDomain, hasParent) = subDomain.cut();
+        assertEq(true, hasParent);
+        assertEq("a", label.toString());
+        assertEq("..test.com", parentDomain.toString());
+
+        subDomain = "com..";
+        (label, parentDomain, hasParent) = subDomain.cut();
+        assertEq(true, hasParent);
+        assertEq("com", label.toString());
+        assertEq(".", parentDomain.toString());
+
+        subDomain = "com..";
+        (label, parentDomain, hasParent) = subDomain.cut();
+        assertEq(true, hasParent);
+        assertEq("com", label.toString());
+        assertEq(".", parentDomain.toString());
+
+        subDomain = "com.";
+        (label, parentDomain, hasParent) = subDomain.cut();
+        assertEq(true, hasParent);
+        assertEq("com", label.toString());
+        assertEq("", parentDomain.toString());
     }
 
     function testTraceAllLevel() public {
         string memory subDomain;
-        subDomain = "a.b.c.d.e";
-        uint256[] memory parentSlices;
-        parentSlices = subDomain.allLevels();
-        assertEq(parentSlices.length, 5);
-        assertEq(parentSlices[0].toString(), "a.b.c.d.e");
-        assertEq(parentSlices[1].toString(), "b.c.d.e");
-        assertEq(parentSlices[2].toString(), "c.d.e");
-        assertEq(parentSlices[3].toString(), "d.e");
-        assertEq(parentSlices[4].toString(), "e");
+        subDomain = "a.b.c.d.e.test.com";
+        uint256[] memory allLevels;
+        allLevels = subDomain.allLevels();
+        assertEq(allLevels.length, 7);
+        assertEq(allLevels[0].toString(), "a.b.c.d.e.test.com");
+        assertEq(allLevels[1].toString(), "b.c.d.e.test.com");
+        assertEq(allLevels[2].toString(), "c.d.e.test.com");
+        assertEq(allLevels[3].toString(), "d.e.test.com");
+        assertEq(allLevels[4].toString(), "e.test.com");
+        assertEq(allLevels[5].toString(), "test.com");
+        assertEq(allLevels[6].toString(), "com");
 
-        subDomain = unicode"汤唯.中国";
-        parentSlices = subDomain.allLevels();
-        assertEq(parentSlices.length, 2);
-        assertEq(parentSlices[0].toString(), unicode"汤唯.中国");
-        assertEq(parentSlices[1].toString(), unicode"中国");
+        subDomain = unicode"汤唯.中国.test.com";
+        allLevels = subDomain.allLevels();
+        assertEq(allLevels.length, 4);
+        assertEq(allLevels[0].toString(), unicode"汤唯.中国.test.com");
+        assertEq(allLevels[1].toString(), unicode"中国.test.com");
+        assertEq(allLevels[2].toString(), unicode"test.com");
+        assertEq(allLevels[3].toString(), unicode"com");
+    }
+
+    function testValidLabel() public {
+        bool isValidLabel;
+        string memory label;
+
+        label = "com";
+        isValidLabel = label.isValidLabel();
+        assertEq(isValidLabel, true);
+
+        label = "baidu";
+        isValidLabel = label.isValidLabel();
+        assertEq(isValidLabel, true);
+
+        label = "google";
+        isValidLabel = label.isValidLabel();
+        assertEq(isValidLabel, true);
+
+        label = "jd";
+        isValidLabel = label.isValidLabel();
+        assertEq(isValidLabel, true);
+
+        label = "test";
+        isValidLabel = label.isValidLabel();
+        assertEq(isValidLabel, true);
+
+        label = "org";
+        isValidLabel = label.isValidLabel();
+        assertEq(isValidLabel, true);
     }
 
     function testInValidLabel() public {

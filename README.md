@@ -47,7 +47,8 @@ $ anvil
 ### Deploy
 
 ```shell
-$ forge script script/DeployScript.s.sol:DeployScript --rpc-url $GOERLI_RPC_URL --broadcast --verify --slow -vvvv
+$ source .env
+$ forge script script/DeployScript.s.sol:DeployScript --rpc-url $OP_RPC_URL --broadcast --verify --slow -vvvv
 ```
 
 ### Cast

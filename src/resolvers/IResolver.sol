@@ -1,37 +1,36 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.21;
 
+/**
+ * @title Custom resolver interface for Terminus DID tags.
+ *
+ * @dev Besides the required functions listed in this interface, a resolver
+ *      MUST provide a external view getter function for every defined tag
+ *      with name <tagName> and parameter list `(uint256 tokenId)`,
+ *      where <tagName> is the tag name in `camelCase`,
+ *      e.g. `cardNumber(uint256 tokenId)`.
+ *
+ *      For the purpose of this documentation, the required getter function
+ *      mentioned above is called the *standard getter* of that tag.
+ *
+ *      Resolvers MAY also provide other getters for a single tag.
+ *
+ *      Public setters are OPTIONAL and can be defined as needed.
+ */
 interface IResolver {
     /**
-     * @notice Checks whether the tag key is supported and validates the value.
+     * @notice Querys the getter function of a tag.
      *
-     * @dev MUST NOT revert inside function body.
+     * @dev MUST use at most 30,000 gas.
      *
-     * @param key   Tag key for checking compatibility and identifying value type.
-     * @param value Tag value to validate.
+     * @param key Tag key as used in registry contract.
      *
-     * @return status Validation result code:
-     *                - Passed(0),
-     *                - KeyRejected(1),
-     *                - KeyReservedButUnimplemented(2),
-     *                - ValueInvalid(otherwise).
+     * @return If the tag key is
+     *         defined => returns function selector of the tag's *standard getter*;
+     *         not defined but reserved for future use => returns 0xffffffff;
+     *         neither defined nor reserved => returns 0x00000000.
+     *
+     * Note: resolvers of subdomains cannot control a tag defined or reserved by any parent.
      */
-    function validate(uint256 key, bytes calldata value) external view returns (uint256 status);
-}
-
-// OPTIONAL: custom resolvers may freely choose whether or not to implement this extension.
-interface IResolverWithParse is IResolver {
-    /**
-     * @notice Checks whether the tag key is supported and parses the value for easier use by other contracts.
-     *
-     * @dev MUST NOT revert inside function body.
-     *
-     * @param key   Tag key for checking compatibility and identifying value type.
-     * @param value Tag value to parse.
-     *
-     * @return status MUST be the same as returned by `validate(key, value)`.
-     * @return parsed Parsed ABI-encoded value in bytes. Typical use: `abi.decode(parsed, (...))`.
-     *                SHOULD be empty if `status` is nonzero.
-     */
-    function parse(uint256 key, bytes calldata value) external view returns (uint256 status, bytes memory parsed);
+    function tagGetter(uint256 key) external view returns (bytes4);
 }
