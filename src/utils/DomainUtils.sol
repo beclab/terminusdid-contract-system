@@ -312,7 +312,7 @@ library DomainUtils {
                 }
                 if b { break }
             }
-            let vl := sub(p, slice)
+            let vl := sub(p, shr(128, slice))
             if gt(vl, l) { vl := sub(vl, cl) }
 
             validLength := vl
