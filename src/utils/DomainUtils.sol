@@ -72,17 +72,28 @@ library DomainUtils {
         return slice;
     }
 
-    function split(string memory domain) internal pure returns (uint256 label, uint256 parentDomain) {
+    function split(string memory domain) internal pure returns (uint256 label, uint256 parent_) {
         return domain.asSlice().split();
     }
 
-    function split(uint256 slice) internal pure returns (uint256 label, uint256 parentDomain) {
-        parentDomain = slice.parent();
+    function split(uint256 slice) internal pure returns (uint256 label, uint256 parent_) {
         assembly {
             let p := shr(128, slice)
-            label := or(sub(shr(128, parentDomain), p), shl(128, p))
+            let e := add(p, and(slice, shr(128, not(0))))
+            for {} lt(p, e) { p := add(1, p) } {
+                if eq(shr(248, mload(p)), 0x2e) {
+                    let b := shr(128, slice)
+                    label := or(sub(p, b), shl(128, b))
+                    p := add(1, p)
+                    parent_ := or(sub(e, p), shl(128, p))
+                    break
+                }
+            }
+            if eq(p, e) {
+                label := slice
+                parent_ := shl(128, p)
+            }
         }
-        return (label, parentDomain);
     }
 
     function allLevels(string memory domain) internal pure returns (uint256[] memory) {
