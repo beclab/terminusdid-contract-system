@@ -46,9 +46,9 @@ abstract contract MetadataRegistryUpgradeable is Initializable {
     }
 
     function __MetadataRegistry_register(Metadata memory metadata) internal returns (uint256 id) {
-        (uint256 label, uint256 parent) = metadata.domain.split();
+        (uint256 label, uint256 parent, bool hasParent) = metadata.domain.cut();
 
-        if (!parent.isEmpty()) {
+        if (hasParent) {
             Metadata memory parentData = __MetadataRegistry_get(parent.tokenId());
             if (parentData.domain.isEmpty()) {
                 revert UnregisteredParentDomain();

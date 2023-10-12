@@ -56,32 +56,22 @@ library DomainUtils {
         return domain.asSlice().parent();
     }
 
-    function parent(uint256 slice) internal pure returns (uint256) {
+    function parent(uint256 slice) internal pure returns (uint256 $) {
+        (, $,) = slice.cut();
+    }
+
+    function cut(string memory domain) internal pure returns (uint256 label, uint256 parent_, bool hasParent) {
+        return domain.asSlice().cut();
+    }
+
+    function cut(uint256 slice) internal pure returns (uint256 label, uint256 parent_, bool hasParent) {
         assembly {
+            label := slice
             let p := shr(128, slice)
             let e := add(p, and(slice, shr(128, not(0))))
             for {} lt(p, e) { p := add(1, p) } {
                 if eq(shr(248, mload(p)), 0x2e) {
-                    p := add(1, p)
-                    slice := or(sub(e, p), shl(128, p))
-                    break
-                }
-            }
-            if eq(p, e) { slice := shl(128, p) }
-        }
-        return slice;
-    }
-
-    function split(string memory domain) internal pure returns (uint256 label, uint256 parent_) {
-        return domain.asSlice().split();
-    }
-
-    function split(uint256 slice) internal pure returns (uint256 label, uint256 parent_) {
-        assembly {
-            let p := shr(128, slice)
-            let e := add(p, and(slice, shr(128, not(0))))
-            for {} lt(p, e) { p := add(1, p) } {
-                if eq(shr(248, mload(p)), 0x2e) {
+                    hasParent := true
                     let b := shr(128, slice)
                     label := or(sub(p, b), shl(128, b))
                     p := add(1, p)
@@ -89,10 +79,7 @@ library DomainUtils {
                     break
                 }
             }
-            if eq(p, e) {
-                label := slice
-                parent_ := shl(128, p)
-            }
+            if eq(p, e) { parent_ := shl(128, p) }
         }
     }
 
