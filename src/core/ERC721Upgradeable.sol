@@ -107,7 +107,7 @@ abstract contract ERC721Upgradeable is
     function approve(address to, uint256 tokenId) public virtual {
         address approver = _msgSender();
         address owner = __ERC721_requireOwned(tokenId);
-        if (owner != approver && !isApprovedForAll(owner, approver)) {
+        if (owner != approver && !__ERC721_isApprovedForAll(owner, approver)) {
             revert ERC721InvalidApprover(approver);
         }
         __ERC721_getStorage()._tokens[tokenId].approved = to;
@@ -129,19 +129,20 @@ abstract contract ERC721Upgradeable is
     }
 
     function isApprovedForAll(address owner, address operator) public view virtual returns (bool) {
-        return __ERC721_getStorage()._operatorApprovals[owner][operator];
+        return __ERC721_isApprovedForAll(owner, operator);
     }
 
     function transferFrom(address from, address to, uint256 tokenId) public virtual {
         if (from == address(0)) {
             revert ERC721InvalidSender(address(0));
         }
+        address approved = __ERC721_approved(tokenId);
         address previousOwner = __ERC721_transfer(to, tokenId);
         if (previousOwner != from) {
             revert ERC721IncorrectOwner(from, tokenId, previousOwner);
         }
         address caller = _msgSender();
-        if (from != caller && !isApprovedForAll(from, caller) && __ERC721_approved(tokenId) != caller) {
+        if (from != caller && !__ERC721_isApprovedForAll(from, caller) && approved != caller) {
             revert ERC721InsufficientApproval(caller, tokenId);
         }
     }
@@ -161,6 +162,10 @@ abstract contract ERC721Upgradeable is
 
     function __ERC721_approved(uint256 tokenId) internal view returns (address) {
         return __ERC721_getStorage()._tokens[tokenId].approved;
+    }
+
+    function __ERC721_isApprovedForAll(address owner, address operator) internal view returns (bool) {
+        return __ERC721_getStorage()._operatorApprovals[owner][operator];
     }
 
     function __ERC721_requireOwned(uint256 tokenId) internal view returns (address) {
@@ -212,11 +217,11 @@ abstract contract ERC721Upgradeable is
         }
     }
 
-    function __ERC721_update(address to, uint256 tokenId) private returns (address) {
+    function __ERC721_update(address to, uint256 tokenId) private returns (address from) {
         __ERC721_Storage storage $ = __ERC721_getStorage();
 
         __ERC721_TokenData memory token = $._tokens[tokenId];
-        address from = token.owner;
+        from = token.owner;
 
         if (from == address(0)) {
             assert(to != address(0));
@@ -260,8 +265,6 @@ abstract contract ERC721Upgradeable is
         $._tokens[tokenId] = token;
 
         emit Transfer(from, to, tokenId);
-
-        return from;
     }
 
     function __ERC721_getStorage() private pure returns (__ERC721_Storage storage $) {
