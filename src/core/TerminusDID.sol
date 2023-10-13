@@ -65,14 +65,17 @@ contract TerminusDID is
     }
 
     function getTagValue(uint256 tokenId, uint256 key) public view returns (bool exists, bytes memory value) {
+        __ERC721_requireOwned(tokenId);
         return __TagRegistry_get(tokenId, key);
     }
 
     function getTagCount(uint256 tokenId) public view returns (uint256) {
+        __ERC721_requireOwned(tokenId);
         return __TagRegistry_count(tokenId);
     }
 
     function getTagKeys(uint256 tokenId) public view returns (uint256[] memory) {
+        __ERC721_requireOwned(tokenId);
         return __TagRegistry_keys(tokenId);
     }
 
