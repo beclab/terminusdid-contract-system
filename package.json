@@ -26,6 +26,7 @@
     "@typechain/hardhat": "^6.1.6",
     "@types/chai": "^4.3.6",
     "@types/mocha": "^9.1.1",
+    "@openzeppelin/hardhat-upgrades": "^1.21.0",
     "hardhat": "^2.11.1",
     "hardhat-preprocessor": "^0.1.5",
     "node-rsa": "^1.1.1"
