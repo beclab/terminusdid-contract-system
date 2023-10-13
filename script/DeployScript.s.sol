@@ -22,7 +22,7 @@ contract DeployScript is Script {
         bytes memory initData = abi.encodeWithSelector(TerminusDID.initialize.selector, _name, _symbol);
         ERC1967Proxy proxy = new ERC1967Proxy(address(registry), initData);
         TerminusDID registryProxy = TerminusDID(address(proxy));
-        
+
         PublicResolver resolver = new PublicResolver();
         Registrar registrar = new Registrar(address(registryProxy), address(resolver), operator);
 
