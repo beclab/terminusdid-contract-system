@@ -16,8 +16,6 @@ contract CustomResolver is IResolver, Context {
 
     error Unauthorized();
 
-    error UnsupportedTag(uint256 key);
-
     error InvalidId();
 
     constructor(address registrar_, address registry_) {
@@ -37,11 +35,7 @@ contract CustomResolver is IResolver, Context {
         return address(_registry);
     }
 
-    function setStaffId(string calldata domain, uint256 key, uint32 id) external {
-        if (!supportsTag(key)) {
-            revert UnsupportedTag(key);
-        }
-
+    function setStaffId(string calldata domain, uint32 id) external {
         if (id == 0) {
             revert InvalidId();
         }
@@ -58,8 +52,10 @@ contract CustomResolver is IResolver, Context {
     function getStaffId(string calldata domain) external view returns (uint32 id) {
         (bool exists, bytes memory value) = _registry.getTagValue(domain.tokenId(), _STAFF_ID);
         if (exists) {
-            return uint32(bytes4(value));
+            id = uint32(bytes4(value));
+        } else {
+            id = 0;
         }
-        return 0;
+        
     }
 }

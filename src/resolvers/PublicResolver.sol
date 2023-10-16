@@ -18,10 +18,6 @@ contract PublicResolver is IResolver, Context {
     IRegistrar private _registrar;
     ITerminusDID private _registry;
 
-    error NoPublicReservedTag(uint256 key);
-
-    error UnsupportedTag(uint256 key);
-
     error Unauthorized();
 
     error Asn1DecodeError(Asn1Decode.ErrorCode errorCode);
@@ -45,40 +41,6 @@ contract PublicResolver is IResolver, Context {
         return address(_registry);
     }
 
-    function setPublicTag(string calldata domain, uint256 key, bytes calldata value) external {
-        if (key > _PUBLIC_KEY_LIMIT) {
-            revert NoPublicReservedKey(key);
-        }
-
-        address caller = _msgSender();
-        (, uint256 ownedLevel,) = _registrar.traceOwner(domain, caller);
-        if (ownedLevel == 0) {
-            revert Unauthorized();
-        }
-
-        if (key == _RSA_PUBKEY_RESOLVER) {
-            _setRsaPubKey(domain, value);
-        } else if (key == _DNS_A_RECORD_RESOLVER) {
-            _setDnsARecord(domain, value);
-        } else {
-            revert UnsupportedTag(key);
-        }
-    }
-
-    function getPublicTag(string calldata domain, uint256 key) external returns (bytes memory) {
-        if (key > _PUBLIC_KEY_LIMIT) {
-            revert NoPublicReservedKey(key);
-        }
-
-        if (key == _RSA_PUBKEY_RESOLVER) {
-            return _getRsaPubKey(domain);
-        } else if (key == _DNS_A_RECORD_RESOLVER) {
-            return _getDnsARecord(domain);
-        } else {
-            revert UnsupportedTag(key);
-        }
-    }
-
     /*
     support RSA Pkcs1 ASN.1 format.
     RSAPublicKey ::= SEQUENCE {
@@ -88,14 +50,20 @@ contract PublicResolver is IResolver, Context {
     refs to: https://www.rfc-editor.org/rfc/rfc3447#appendix-A.1
             http://luca.ntop.org/Teaching/Appunti/asn1.html
     */
-    function _setRsaPubKey(string calldata domain, bytes calldata value) internal {
+    function setRsaPubKey(string calldata domain, bytes calldata pubKey) external {
+        address caller = _msgSender();
+        (, uint256 ownedLevel,) = _registrar.traceOwner(domain, caller);
+        if (ownedLevel == 0) {
+            revert Unauthorized();
+        }
+
         Asn1Decode.ErrorCode errorCode;
         uint256 sequenceRange;
-        (errorCode, sequenceRange) = value.rootOfSequenceStringAt(0);
+        (errorCode, sequenceRange) = pubKey.rootOfSequenceStringAt(0);
         if (errorCode != Asn1Decode.ErrorCode.NoError) {
             revert Asn1DecodeError(errorCode);
         }
-        bytes memory sequence = value.bytesAt(sequenceRange);
+        bytes memory sequence = pubKey.bytesAt(sequenceRange);
 
         uint256 modulusRange;
         (errorCode, modulusRange) = sequence.root();
@@ -119,14 +87,14 @@ contract PublicResolver is IResolver, Context {
             revert Asn1DecodeError(errorCode);
         }
 
-        _registrar.setTag(domain, _RSA_PUBKEY_RESOLVER, value);
+        _registrar.setTag(domain, _RSA_PUBKEY_RESOLVER, pubKey);
     }
 
-    function _getRsaPubKey(string calldata domain) internal returns (bytes memory value) {
+    function rsaPubKey(string calldata domain) external view returns (bytes memory pubKey) {
         bool exists;
-        (exists, value) = _registry.getTagValue(domain.tokenId(), _RSA_PUBKEY_RESOLVER);
-        if (exists) {
-            return value;
+        (exists, pubKey) = _registry.getTagValue(domain.tokenId(), _RSA_PUBKEY_RESOLVER);
+        if (!exists) {
+            pubKey = "";
         }
     }
 
@@ -134,19 +102,26 @@ contract PublicResolver is IResolver, Context {
     DNS A record can be represent by 4 bytes, in which each byte represents a number range from 0 to 255.
     The raw bytes data length must be 4.
     */
-    function _setDnsARecord(string memory domain, bytes calldata value) internal {
-        if (value.length != 4) {
+    function setDnsARecord(string memory domain, bytes4 ipv4) internal {
+        address caller = _msgSender();
+        (, uint256 ownedLevel,) = _registrar.traceOwner(domain, caller);
+        if (ownedLevel == 0) {
+            revert Unauthorized();
+        }
+
+        if (ipv4.length != 4) {
             revert InvalidIpV4Length();
         }
 
-        _registrar.setTag(domain, _DNS_A_RECORD_RESOLVER, value);
+        _registrar.setTag(domain, _DNS_A_RECORD_RESOLVER, bytes.concat(ipv4));
     }
 
-    function _getDnsARecord(string calldata domain) internal returns (bytes memory value) {
-        bool exists;
-        (exists, value) = _registry.getTagValue(domain.tokenId(), _DNS_A_RECORD_RESOLVER);
+    function dnsARecord(string calldata domain) external view returns (bytes4 ipv4) {
+        (bool exists, bytes memory value) = _registry.getTagValue(domain.tokenId(), _DNS_A_RECORD_RESOLVER);
         if (exists) {
-            return value;
+            ipv4 = bytes4(value);
+        } else {
+            ipv4 = "";
         }
     }
 }
