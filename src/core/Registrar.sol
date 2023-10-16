@@ -58,7 +58,7 @@ contract Registrar is Context, Ownable2Step, IResolver {
     }
 
     function resolverOf(string calldata domain, uint256 key) public view returns (address) {
-        if (supportsTag(key)) {
+        if (tagGetter(key) != 0) {
             return address(this);
         }
 
@@ -81,8 +81,11 @@ contract Registrar is Context, Ownable2Step, IResolver {
         return address(0);
     }
 
-    function supportsTag(uint256 key) public pure returns (bool) {
-        return key == _TAGKEY_CUSTOM_RESOLVER;
+    function tagGetter(uint256 key) public pure returns (bytes4) {
+        if (key == _TAGKEY_CUSTOM_RESOLVER) {
+            return this.customResolver.selector;
+        }
+        return 0;
     }
 
     function customResolver(uint256 tokenId) public view returns (address) {
@@ -167,10 +170,10 @@ contract Registrar is Context, Ownable2Step, IResolver {
 
     function _supportsTag(address resolver, uint256 key) internal view returns (bool success, bool supported) {
         bytes memory data;
-        (success, data) = resolver.staticcall{gas: 30000}(abi.encodeCall(IResolver.supportsTag, (key)));
+        (success, data) = resolver.staticcall{gas: 30000}(abi.encodeCall(IResolver.tagGetter, (key)));
         // TODO: simplify codes when solidity supports try-decoding
-        if (success && data.length >= 32 && (bytes32(data) & ~bytes32(uint256(1))) == 0) {
-            supported = abi.decode(data, (bool));
+        if (success && data.length >= 32 && (bytes32(data) & (~bytes32(uint256(1))) >> 4) == 0) {
+            supported = abi.decode(data, (bytes4)) != 0;
         } else {
             success = false;
         }
