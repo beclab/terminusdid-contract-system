@@ -64,7 +64,7 @@ contract Registrar is Context, Ownable2Step, IResolver {
         }
         assembly {
             $.address := resolver
-            $.selector := getter
+            $.selector := shr(224, getter)
         }
     }
 
@@ -162,7 +162,7 @@ contract Registrar is Context, Ownable2Step, IResolver {
                 ok := staticcall(gas(), resolver, input, 36, 0, 0)
                 outputSize := returndatasize()
             }
-            if (!(ok && outputSize > 0 && outputSize % 32 == 0)) {
+            if (!(ok && outputSize >= 32)) {
                 revert BadResolver(resolver);
             }
         }

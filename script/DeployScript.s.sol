@@ -17,7 +17,7 @@ contract DeployScript is Script {
         string memory _symbol = vm.envString("TERMINUSDID_SYMBOL");
 
         vm.startBroadcast(deployerPrivateKey);
-        
+
         Registrar registrar = new Registrar(address(0), address(0), deployer);
 
         TerminusDID registry = new TerminusDID();
@@ -27,10 +27,10 @@ contract DeployScript is Script {
         registryProxy.setRegistrar(address(registrar));
 
         RootResolver rootResolver = new RootResolver(address(registrar), address(registryProxy), bot);
-        
+
         registrar.setRegistry(address(registryProxy));
         registrar.setRootResolver(address(rootResolver));
-        
+
         registrar.register(bot, Metadata("com", "did", "", true));
         registrar.register(bot, Metadata("snowinning.com", "did", "", true));
         registrar.setOperator(bot);
