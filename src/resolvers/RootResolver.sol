@@ -5,11 +5,9 @@ import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {IResolver} from "./IResolver.sol";
 import {ITerminusDID, IRegistrar} from "../utils/Interfaces.sol";
 import {Asn1Decode} from "../utils/Asn1Decode.sol";
-import {DomainUtils} from "../utils/DomainUtils.sol";
 
 contract RootResolver is IResolver, Context {
     using Asn1Decode for bytes;
-    using DomainUtils for string;
 
     uint256 private constant _RSA_PUBKEY_RESOLVER = 0x12;
     uint256 private constant _DNS_A_RECORD_RESOLVER = 0x13;
@@ -108,8 +106,8 @@ contract RootResolver is IResolver, Context {
         _registrar.setTag(domain, _RSA_PUBKEY_RESOLVER, pubKey);
     }
 
-    function rsaPubKey(string calldata domain) external view returns (bytes memory pubKey) {
-        (, pubKey) = _registry.getTagValue(domain.tokenId(), _RSA_PUBKEY_RESOLVER);
+    function rsaPubKey(uint256 tokenId) external view returns (bytes memory pubKey) {
+        (, pubKey) = _registry.getTagValue(tokenId, _RSA_PUBKEY_RESOLVER);
     }
 
     /*
@@ -124,8 +122,8 @@ contract RootResolver is IResolver, Context {
         _registrar.setTag(domain, _DNS_A_RECORD_RESOLVER, bytes.concat(ipv4));
     }
 
-    function dnsARecord(string calldata domain) external view returns (bytes4 ipv4) {
-        (bool exists, bytes memory value) = _registry.getTagValue(domain.tokenId(), _DNS_A_RECORD_RESOLVER);
+    function dnsARecord(uint256 tokenId) external view returns (bytes4 ipv4) {
+        (bool exists, bytes memory value) = _registry.getTagValue(tokenId, _DNS_A_RECORD_RESOLVER);
         if (exists) {
             ipv4 = bytes4(value);
         }

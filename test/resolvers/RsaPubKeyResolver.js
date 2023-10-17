@@ -3,10 +3,10 @@ var NodeRSA = require('node-rsa');
 const { loadFixture } = require('@nomicfoundation/hardhat-network-helpers');
 const { expect } = require('chai');
 const { ethers } = require('hardhat');
-const { register } = require('module');
 
 const { BigNumber, utils, constants, getContractFactory, getSigners } = ethers;
 const { AddressZero } = constants;
+const { keccak256, toUtf8Bytes } = utils;
 
 describe('RsaPubKey test', function () {
     async function deployTokenFixture() {
@@ -47,7 +47,7 @@ describe('RsaPubKey test', function () {
 
         // set and get pubKey from contract
         await rootResolver.connect(operator).setRsaPubKey("a", pubKeyDer);
-        const pubKeyDerRet = await rootResolver.rsaPubKey("a");
+        const pubKeyDerRet = await rootResolver.rsaPubKey(tokenId("a"));
         expect(pubKeyDerRet.slice(2)).to.equal(pubKeyDer.toString("hex"));
     }
 
@@ -70,7 +70,7 @@ describe('RsaPubKey test', function () {
 
             await registrar.connect(operator).register(operator.address, { domain: "a", did: "did", notes: "", allowSubdomain: true })
             await rootResolver.connect(operator).setRsaPubKey("a", pubKeyDer);
-            const pubKeyDerRet = await rootResolver.rsaPubKey("a");
+            const pubKeyDerRet = await rootResolver.rsaPubKey(tokenId("a"));
             expect(pubKeyDerRet.slice(2)).to.equal(pubKeyDer.toString("hex"));
         });
 
@@ -116,3 +116,7 @@ describe('RsaPubKey test', function () {
         });
     });
 });
+
+function tokenId(domain) {
+    return BigNumber.from(keccak256(toUtf8Bytes(domain)));
+}

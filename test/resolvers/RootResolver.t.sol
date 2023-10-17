@@ -10,8 +10,11 @@ import {InvalidCustomResolver} from "../mocks/InvalidCustomResolver.sol";
 import {TerminusDID} from "../../src/core/TerminusDID.sol";
 import {Registrar} from "../../src/core/Registrar.sol";
 import {Metadata} from "../../src/core/MetadataRegistryUpgradeable.sol";
+import {DomainUtils} from "../../src/utils/DomainUtils.sol";
 
 contract TerminusDIDTest is Test {
+    using DomainUtils for string;
+
     RootResolver public rootResolver;
     CustomResolver public customResolver;
 
@@ -58,13 +61,14 @@ contract TerminusDIDTest is Test {
         bytes memory value =
             hex"3082010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001";
 
+        string memory domain = "a";
         address aOwner = address(100);
         vm.prank(operator);
-        registrar.register(aOwner, Metadata("a", "did", "", true));
+        registrar.register(aOwner, Metadata(domain, "did", "", true));
 
         vm.prank(operator);
-        rootResolver.setRsaPubKey("a", value);
-        bytes memory valueRet = rootResolver.rsaPubKey("a");
+        rootResolver.setRsaPubKey(domain, value);
+        bytes memory valueRet = rootResolver.rsaPubKey(domain.tokenId());
 
         assertEq(value, valueRet);
     }
@@ -86,14 +90,15 @@ contract TerminusDIDTest is Test {
         bytes4 value;
         value = hex"ffffffff";
 
+        string memory domain = "a";
         address aOwner = address(100);
         vm.prank(operator);
-        registrar.register(aOwner, Metadata("a", "did", "", true));
+        registrar.register(aOwner, Metadata(domain, "did", "", true));
 
         vm.prank(operator);
-        rootResolver.setDnsARecord("a", value);
+        rootResolver.setDnsARecord(domain, value);
 
-        bytes4 valueRet = rootResolver.dnsARecord("a");
+        bytes4 valueRet = rootResolver.dnsARecord(domain.tokenId());
         assertEq(value, valueRet);
     }
 }

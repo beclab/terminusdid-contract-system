@@ -158,7 +158,7 @@ contract Registrar is Context, Ownable2Step, IResolver {
             assembly {
                 let input := mload(0x40)
                 mstore(input, selector)
-                mstore(add(4, input), key)
+                mstore(add(4, input), tokenId)
                 ok := staticcall(gas(), resolver, input, 36, 0, 0)
                 outputSize := returndatasize()
             }
