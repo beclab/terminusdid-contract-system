@@ -23,7 +23,7 @@ contract Registrar is Context, Ownable2Step, IResolver {
 
     error Unauthorized();
 
-    error UnsupportedTag(uint256 key);
+    error UnsupportedTag(uint256 tokenId, uint256 key);
 
     error BadResolver(address resolver);
 
@@ -57,28 +57,23 @@ contract Registrar is Context, Ownable2Step, IResolver {
         _rootResolver = rootResolver_;
     }
 
+    function getterOf(string calldata domain, uint256 key) public view returns (function(uint256) external view $) {
+        (address resolver, bytes4 getter) = _traceResolver(domain, key);
+        if (resolver == address(0)) {
+            revert UnsupportedTag(domain.tokenId(), key);
+        }
+        assembly {
+            $.address := resolver
+            $.selector := getter
+        }
+    }
+
     function resolverOf(string calldata domain, uint256 key) public view returns (address) {
-        if (tagGetter(key) != 0) {
-            return address(this);
+        (address resolver,) = _traceResolver(domain, key);
+        if (resolver == address(0)) {
+            revert UnsupportedTag(domain.tokenId(), key);
         }
-
-        uint256[] memory levels = domain.allLevels();
-
-        address resolver = _rootResolver;
-        for (uint256 i = levels.length;;) {
-            if (resolver != address(0)) {
-                (bool success, bool supported) = _supportsTag(resolver, key);
-                if (success && supported) {
-                    return resolver;
-                }
-            }
-            if (i == 0) {
-                break;
-            }
-            resolver = customResolver(levels[--i].tokenId());
-        }
-
-        return address(0);
+        return resolver;
     }
 
     function tagGetter(uint256 key) public pure returns (bytes4) {
@@ -101,8 +96,8 @@ contract Registrar is Context, Ownable2Step, IResolver {
         if (_msgSender() != _registry.ownerOf(tokenId)) {
             revert Unauthorized();
         }
-        (bool success, bool supported) = _supportsTag(resolver, 0xffff);
-        if (!success || supported) {
+        (bool success, bytes4 getter) = _tagGetter(resolver, 0xffff);
+        if (!success || getter != 0) {
             revert BadResolver(resolver);
         }
         _registry.setTag(tokenId, _TAGKEY_CUSTOM_RESOLVER, bytes.concat(bytes20(uint160(resolver))));
@@ -146,17 +141,56 @@ contract Registrar is Context, Ownable2Step, IResolver {
     }
 
     function setTag(string calldata domain, uint256 key, bytes calldata value) public returns (bool addedOrRemoved) {
+        uint256 tokenId = domain.tokenId();
+        addedOrRemoved = _registry.setTag(tokenId, key, value);
+
         address caller = _msgSender();
         if (caller != operator()) {
-            address resolver = resolverOf(domain, key);
+            function(uint256) external view getter = getterOf(domain, key);
+            (address resolver, bytes4 selector) = (getter.address, getter.selector);
+
             if (caller != resolver) {
-                if (resolver == address(0)) {
-                    revert UnsupportedTag(key);
-                }
                 revert Unauthorized();
             }
+
+            bool ok;
+            uint256 outputSize;
+            assembly {
+                let input := mload(0x40)
+                mstore(input, selector)
+                mstore(add(4, input), key)
+                ok := staticcall(gas(), resolver, input, 36, 0, 0)
+                outputSize := returndatasize()
+            }
+            if (!(ok && outputSize > 0 && outputSize % 32 == 0)) {
+                revert BadResolver(resolver);
+            }
         }
-        return _registry.setTag(domain.tokenId(), key, value);
+    }
+
+    function _traceResolver(string calldata domain, uint256 key) internal view returns (address ca, bytes4 getter) {
+        getter = tagGetter(key);
+        if (getter != 0) {
+            return (address(this), getter);
+        }
+
+        uint256[] memory levels = domain.allLevels();
+
+        address resolver = _rootResolver;
+        for (uint256 i = levels.length;;) {
+            if (resolver != address(0)) {
+                bool success;
+                (success, getter) = _tagGetter(resolver, key);
+                if (success && getter != 0) {
+                    ca = resolver;
+                    break;
+                }
+            }
+            if (i == 0) {
+                break;
+            }
+            resolver = customResolver(levels[--i].tokenId());
+        }
     }
 
     function _allowRegister(address auth, string memory domain) internal view returns (bool) {
@@ -168,12 +202,12 @@ contract Registrar is Context, Ownable2Step, IResolver {
         return false;
     }
 
-    function _supportsTag(address resolver, uint256 key) internal view returns (bool success, bool supported) {
+    function _tagGetter(address resolver, uint256 key) internal view returns (bool success, bytes4 getter) {
         bytes memory data;
         (success, data) = resolver.staticcall{gas: 30000}(abi.encodeCall(IResolver.tagGetter, (key)));
         // TODO: simplify codes when solidity supports try-decoding
         if (success && data.length >= 32 && (bytes32(data) & (~bytes32(uint256(1))) >> 32) == 0) {
-            supported = abi.decode(data, (bytes4)) != 0;
+            getter = abi.decode(data, (bytes4));
         } else {
             success = false;
         }

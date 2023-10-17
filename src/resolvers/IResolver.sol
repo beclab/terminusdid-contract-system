@@ -5,7 +5,7 @@ pragma solidity 0.8.21;
  * @title Custom resolver interface for Terminus DID tags.
  *
  * @dev Besides the required functions listed in this interface, a resolver
- *      MUST provide a public getter function for every defined tag
+ *      MUST provide a external view getter function for every defined tag
  *      with name <tagName> and parameter list `(uint256 tokenId)`,
  *      where <tagName> is the tag name in `camelCase`,
  *      e.g. `cardNumber(uint256 tokenId)`.
