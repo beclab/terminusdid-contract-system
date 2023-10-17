@@ -172,7 +172,7 @@ contract Registrar is Context, Ownable2Step, IResolver {
         bytes memory data;
         (success, data) = resolver.staticcall{gas: 30000}(abi.encodeCall(IResolver.tagGetter, (key)));
         // TODO: simplify codes when solidity supports try-decoding
-        if (success && data.length >= 32 && (bytes32(data) & (~bytes32(uint256(1))) >> 4) == 0) {
+        if (success && data.length >= 32 && (bytes32(data) & (~bytes32(uint256(1))) >> 32) == 0) {
             supported = abi.decode(data, (bytes4)) != 0;
         } else {
             success = false;

@@ -23,8 +23,11 @@ contract CustomResolver is IResolver, Context {
         _registry = ITerminusDID(registry_);
     }
 
-    function supportsTag(uint256 key) public pure returns (bool) {
-        return key == _STAFF_ID;
+    function tagGetter(uint256 key) public pure returns (bytes4) {
+        if (key == _STAFF_ID) {
+            return this.staffId.selector;
+        }
+        return 0;
     }
 
     function getRegistrar() external view returns (address) {
@@ -49,13 +52,10 @@ contract CustomResolver is IResolver, Context {
         _registrar.setTag(domain, _STAFF_ID, bytes.concat(bytes4(id)));
     }
 
-    function getStaffId(string calldata domain) external view returns (uint32 id) {
+    function staffId(string calldata domain) external view returns (uint32 id) {
         (bool exists, bytes memory value) = _registry.getTagValue(domain.tokenId(), _STAFF_ID);
         if (exists) {
             id = uint32(bytes4(value));
-        } else {
-            id = 0;
         }
-        
     }
 }

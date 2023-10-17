@@ -7,14 +7,14 @@ import {ITerminusDID, IRegistrar} from "../utils/Interfaces.sol";
 import {Asn1Decode} from "../utils/Asn1Decode.sol";
 import {DomainUtils} from "../utils/DomainUtils.sol";
 
-contract PublicResolver is IResolver, Context {
+contract RootResolver is IResolver, Context {
     using Asn1Decode for bytes;
     using DomainUtils for string;
 
-    uint256 private constant _PUBLIC_KEY_LIMIT = 0xffff;
     uint256 private constant _RSA_PUBKEY_RESOLVER = 0x12;
     uint256 private constant _DNS_A_RECORD_RESOLVER = 0x13;
 
+    address private _operator;
     IRegistrar private _registrar;
     ITerminusDID private _registry;
 
@@ -24,21 +24,45 @@ contract PublicResolver is IResolver, Context {
 
     error InvalidIpV4Length();
 
-    constructor(address registrar_, address registry_) {
+    modifier authorizationCheck(string memory domain) {
+        address caller = _msgSender();
+        if (caller != _operator) {
+            (, uint256 ownedLevel,) = _registrar.traceOwner(domain, caller);
+            if (ownedLevel == 0) {
+                revert Unauthorized();
+            }
+        }
+        _;
+    }
+
+    constructor(address registrar_, address registry_, address operator_) {
         _registrar = IRegistrar(registrar_);
         _registry = ITerminusDID(registry_);
+        _operator = operator_;
     }
 
-    function supportsTag(uint256 key) external pure returns (bool) {
-        return key == _RSA_PUBKEY_RESOLVER || key == _DNS_A_RECORD_RESOLVER;
+    function tagGetter(uint256 key) external pure returns (bytes4) {
+        if (key == _RSA_PUBKEY_RESOLVER) {
+            return this.rsaPubKey.selector;
+        } else if (key == _DNS_A_RECORD_RESOLVER) {
+            return this.dnsARecord.selector;
+        } else if (key <= 0xffff) {
+            return bytes4(0xffffffff);
+        } else {
+            return 0;
+        }
     }
 
-    function getRegistrar() external view returns (address) {
+    function registrar() external view returns (address) {
         return address(_registrar);
     }
 
-    function getRegistry() external view returns (address) {
+    function registry() external view returns (address) {
         return address(_registry);
+    }
+
+    function operartor() external view returns (address) {
+        return _operator;
     }
 
     /*
@@ -50,13 +74,7 @@ contract PublicResolver is IResolver, Context {
     refs to: https://www.rfc-editor.org/rfc/rfc3447#appendix-A.1
             http://luca.ntop.org/Teaching/Appunti/asn1.html
     */
-    function setRsaPubKey(string calldata domain, bytes calldata pubKey) external {
-        address caller = _msgSender();
-        (, uint256 ownedLevel,) = _registrar.traceOwner(domain, caller);
-        if (ownedLevel == 0) {
-            revert Unauthorized();
-        }
-
+    function setRsaPubKey(string calldata domain, bytes calldata pubKey) external authorizationCheck(domain) {
         Asn1Decode.ErrorCode errorCode;
         uint256 sequenceRange;
         (errorCode, sequenceRange) = pubKey.rootOfSequenceStringAt(0);
@@ -91,24 +109,14 @@ contract PublicResolver is IResolver, Context {
     }
 
     function rsaPubKey(string calldata domain) external view returns (bytes memory pubKey) {
-        bool exists;
-        (exists, pubKey) = _registry.getTagValue(domain.tokenId(), _RSA_PUBKEY_RESOLVER);
-        if (!exists) {
-            pubKey = "";
-        }
+        (, pubKey) = _registry.getTagValue(domain.tokenId(), _RSA_PUBKEY_RESOLVER);
     }
 
     /*
     DNS A record can be represent by 4 bytes, in which each byte represents a number range from 0 to 255.
     The raw bytes data length must be 4.
     */
-    function setDnsARecord(string memory domain, bytes4 ipv4) internal {
-        address caller = _msgSender();
-        (, uint256 ownedLevel,) = _registrar.traceOwner(domain, caller);
-        if (ownedLevel == 0) {
-            revert Unauthorized();
-        }
-
+    function setDnsARecord(string memory domain, bytes4 ipv4) external authorizationCheck(domain) {
         if (ipv4.length != 4) {
             revert InvalidIpV4Length();
         }
@@ -120,8 +128,6 @@ contract PublicResolver is IResolver, Context {
         (bool exists, bytes memory value) = _registry.getTagValue(domain.tokenId(), _DNS_A_RECORD_RESOLVER);
         if (exists) {
             ipv4 = bytes4(value);
-        } else {
-            ipv4 = "";
         }
     }
 }

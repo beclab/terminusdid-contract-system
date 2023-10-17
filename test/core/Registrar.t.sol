@@ -3,10 +3,11 @@ pragma solidity 0.8.21;
 
 import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {TerminusDID} from "../../src/core/TerminusDID.sol";
-import {Registrar, Permissions} from "../../src/core/Registrar.sol";
-import {PublicResolver} from "../../src/resolvers/PublicResolver.sol";
+import {Registrar} from "../../src/core/Registrar.sol";
+import {RootResolver} from "../../src/resolvers/RootResolver.sol";
 import {CustomResolver} from "../../src/resolvers/examples/CustomResolver.sol";
 import {DomainUtils} from "../../src/utils/DomainUtils.sol";
 import {EmptyContract} from "../mocks/EmptyContract.sol";
@@ -16,7 +17,7 @@ import {Metadata, MetadataRegistryUpgradeable} from "../../src/core/MetadataRegi
 contract RegistrarTest is Test {
     using DomainUtils for string;
 
-    PublicResolver public resolver;
+    RootResolver public rootResolver;
     Registrar public registrar;
     TerminusDID public registryProxy;
 
@@ -27,8 +28,7 @@ contract RegistrarTest is Test {
     string _symbol = "TDID";
 
     function setUp() public {
-        resolver = new PublicResolver();
-        registrar = new Registrar(address(0), address(resolver), operator);
+        registrar = new Registrar(address(0), address(0), operator);
 
         TerminusDID registry = new TerminusDID();
         bytes memory initData = abi.encodeWithSelector(TerminusDID.initialize.selector, _name, _symbol);
@@ -36,22 +36,28 @@ contract RegistrarTest is Test {
         registryProxy = TerminusDID(address(proxy));
         registryProxy.setRegistrar(address(registrar));
 
+        rootResolver = new RootResolver(address(registrar), address(registryProxy), operator);
+
         registrar.setRegistry(address(registryProxy));
+        registrar.setRootResolver(address(rootResolver));
     }
 
     function testBasis() public {
         assertEq(registrar.registry(), address(registryProxy));
-        assertEq(registrar.resolver(), address(resolver));
+        assertEq(registrar.rootResolver(), address(rootResolver));
         // only owner can set
         address notOwner = address(100);
         vm.prank(notOwner);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
-        registrar.setResolver(address(200));
+        registrar.setRootResolver(address(200));
         vm.prank(registrarOwner);
-        registrar.setResolver(address(200));
-        assertEq(registrar.resolver(), address(200));
+        registrar.setRootResolver(address(200));
+        assertEq(registrar.rootResolver(), address(200));
     }
 
+    /*//////////////////////////////////////////////////////////////
+                             Ownership test
+    //////////////////////////////////////////////////////////////*/
     function testOwnership() public {
         assertEq(registrar.owner(), registrarOwner);
 
@@ -74,6 +80,9 @@ contract RegistrarTest is Test {
         assertEq(registrar.owner(), newOwner);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                             Register test
+    //////////////////////////////////////////////////////////////*/
     function testRegisterTopLevelDomain() public {
         address comOwner = address(100);
 
@@ -219,8 +228,11 @@ contract RegistrarTest is Test {
 
         // cannot register subdomains without direct parent domain
         domain = "c.b.a";
+        string memory notExistParentDomain = "b.a";
         vm.prank(aOwner);
-        vm.expectRevert(Permissions.NonexistentDomain.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, notExistParentDomain.tokenId())
+        );
         registrar.register(aOwner, Metadata(domain, did, "", true));
 
         // even contract operator cannot register subdomains without direct parent domain
@@ -246,6 +258,9 @@ contract RegistrarTest is Test {
         registrar.register(cOwner, Metadata("c.b.a", did, "", false));
     }
 
+    /*//////////////////////////////////////////////////////////////
+                             Set tag test
+    //////////////////////////////////////////////////////////////*/
     function testSetTag() public {
         address aOwner = address(100);
         string memory did = "did";
@@ -257,7 +272,7 @@ contract RegistrarTest is Test {
         bytes memory value =
             hex"3082010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001";
 
-        vm.prank(aOwner);
+        vm.prank(operator);
         registrar.setTag(domain, key, value);
 
         uint256 tokenId = domain.tokenId();
@@ -276,46 +291,32 @@ contract RegistrarTest is Test {
         address aOwner = address(100);
         vm.prank(operator);
         registrar.register(aOwner, Metadata("a", did, "", true));
-        vm.prank(aOwner);
+        vm.prank(operator);
         registrar.setTag("a", key, value);
 
         address bOwner = address(200);
-        vm.prank(aOwner);
+        vm.prank(operator);
         registrar.register(bOwner, Metadata("b.a", did, "", true));
-        vm.prank(bOwner);
+        vm.prank(operator);
         registrar.setTag("b.a", key, value);
 
         address cOwner = address(300);
-        vm.prank(bOwner);
+        vm.prank(operator);
         registrar.register(cOwner, Metadata("c.b.a", did, "", true));
-        vm.prank(cOwner);
+        vm.prank(operator);
         registrar.setTag("c.b.a", key, value);
 
         address dOwner = address(400);
-        vm.prank(cOwner);
+        vm.prank(operator);
         registrar.register(dOwner, Metadata("d.c.b.a", did, "", true));
-        vm.prank(dOwner);
+        vm.prank(operator);
         registrar.setTag("d.c.b.a", key, value);
 
         address eOwner = address(500);
-        vm.prank(dOwner);
-        registrar.register(eOwner, Metadata("e.d.c.b.a", did, "", true));
-        vm.prank(eOwner);
-        registrar.setTag("e.d.c.b.a", key, value);
-
-        // ancestor domain owner can set tags for child subdomains
-        vm.prank(aOwner);
-        uint256 key2 = 0x12;
-        bytes memory value2 =
-            hex"3082010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001";
-
-        registrar.setTag("e.d.c.b.a", key2, value2);
-
-        // contract operator owner can set/modify tags for child subdomains
         vm.prank(operator);
-        bytes memory value3 = hex"ffffffff";
-
-        registrar.setTag("e.d.c.b.a", key, value3);
+        registrar.register(eOwner, Metadata("e.d.c.b.a", did, "", true));
+        vm.prank(operator);
+        registrar.setTag("e.d.c.b.a", key, value);
     }
 
     function testSetTagUnauthorized() public {
@@ -327,8 +328,8 @@ contract RegistrarTest is Test {
         vm.prank(operator);
         registrar.register(aOwner, Metadata("a", did, "", true));
 
-        address notOwner = address(200);
-        vm.prank(notOwner);
+        address notOperator = address(200);
+        vm.prank(notOperator);
         vm.expectRevert(Registrar.Unauthorized.selector);
         registrar.setTag("a", key, value);
     }
@@ -342,94 +343,113 @@ contract RegistrarTest is Test {
         vm.prank(operator);
         registrar.register(aOwner, Metadata("a", did, "", true));
 
-        vm.prank(aOwner);
-        vm.expectRevert(Permissions.NonexistentDomain.selector);
-        registrar.setTag("b.a", key, value);
-    }
-
-    function testSetTagNotValidValue() public {
-        uint256 key = 0x13;
-        bytes memory value = hex"c0a8010101";
-        string memory did = "did";
-
-        address aOwner = address(100);
+        string memory notExistParentDomain = "b.a";
         vm.prank(operator);
-        registrar.register(aOwner, Metadata("a", did, "", true));
-
-        vm.prank(aOwner);
-        vm.expectRevert(abi.encodeWithSelector(Registrar.InvalidTagValue.selector, 4, address(resolver)));
-        registrar.setTag("a", key, value);
+        vm.expectRevert(
+            abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, notExistParentDomain.tokenId())
+        );
+        registrar.setTag(notExistParentDomain, key, value);
     }
 
-    function testSetTagNotValidKey() public {
-        uint256 key = 0x13000000;
+    /*//////////////////////////////////////////////////////////////
+                             Other tools
+    //////////////////////////////////////////////////////////////*/
+    function testResolverOf() public {
+        uint256 key = 0x13;
         bytes memory value = hex"c0a80101";
         string memory did = "did";
 
         address aOwner = address(100);
         vm.prank(operator);
         registrar.register(aOwner, Metadata("a", did, "", true));
-
-        vm.prank(aOwner);
-        vm.expectRevert(abi.encodeWithSelector(Registrar.UnsupportedTagKey.selector, key));
+        vm.prank(operator);
         registrar.setTag("a", key, value);
+
+        address bOwner = address(200);
+        vm.prank(operator);
+        registrar.register(bOwner, Metadata("b.a", did, "", true));
+        vm.prank(operator);
+        registrar.setTag("b.a", key, value);
+
+        address _resolver;
+        _resolver = registrar.resolverOf("b.a", key);
+        assertEq(_resolver, address(rootResolver));
+
+        key = 0x14;
+        _resolver = registrar.resolverOf("b.a", key);
+        assertEq(_resolver, address(rootResolver));
     }
 
-    function testSetTagCustomResolver() public {
+    function testSetCustomResolver() public {
         address aOwner = address(100);
         string memory did = "did";
         string memory domain = "a";
         vm.prank(operator);
         registrar.register(aOwner, Metadata(domain, did, "", true));
 
-        uint256 key;
-        bytes memory value;
+        CustomResolver customResolver = new CustomResolver(address(registrar), address(registryProxy));
 
-        CustomResolver customResolver = new CustomResolver();
-        key = 0x97;
-        value = abi.encodePacked(address(customResolver));
+        vm.prank(operator);
+        vm.expectRevert(Registrar.Unauthorized.selector);
+        registrar.setCustomResolver(domain, address(customResolver));
+
         vm.prank(aOwner);
-        registrar.setTag(domain, key, value);
+        registrar.setCustomResolver(domain, address(customResolver));
 
-        bool success;
-        bytes memory dataRet;
-        (success, dataRet) = registryProxy.getTagValue(domain.tokenId(), key);
-        assertEq(success, true);
-        assertEq(address(customResolver), address(bytes20(dataRet)));
-
-        // use custom resolver to store string and the key in custom resolver should bigger than 0xffff
-        key = 0xffff01;
-        value = bytes(unicode"君不见黄河之水天上来，奔流到海不复回。君不见高堂明镜悲白发，朝如青丝暮成雪");
-        vm.prank(aOwner);
-        registrar.setTag(domain, key, value);
-
-        (success, dataRet) = registryProxy.getTagValue(domain.tokenId(), key);
-        assertEq(success, true);
-        assertEq0(value, dataRet);
+        assertEq(registrar.customResolver(domain.tokenId()), address(customResolver));
     }
 
-    function testSetTagFromInvalidCustomResolver() public {
+    function testSetInvalidCustomResolver() public {
         address aOwner = address(100);
         string memory did = "did";
         string memory domain = "a";
         vm.prank(operator);
         registrar.register(aOwner, Metadata(domain, did, "", true));
-
-        uint256 key;
-        bytes memory value;
 
         EmptyContract emptyContract = new EmptyContract();
-        key = 0x97;
-        value = abi.encodePacked(address(emptyContract));
         vm.prank(aOwner);
-        vm.expectRevert(abi.encodeWithSelector(Registrar.InvalidTagValue.selector, 7, address(resolver)));
-        registrar.setTag(domain, key, value);
+        vm.expectRevert(abi.encodeWithSelector(Registrar.BadResolver.selector, address(emptyContract)));
+        registrar.setCustomResolver(domain, address(emptyContract));
 
         InvalidCustomResolver invalidCustomResolver = new InvalidCustomResolver();
-        key = 0x97;
-        value = abi.encodePacked(address(invalidCustomResolver));
         vm.prank(aOwner);
-        vm.expectRevert(abi.encodeWithSelector(Registrar.InvalidTagValue.selector, 8, address(resolver)));
-        registrar.setTag(domain, key, value);
+        vm.expectRevert(abi.encodeWithSelector(Registrar.BadResolver.selector, address(invalidCustomResolver)));
+        registrar.setCustomResolver(domain, address(invalidCustomResolver));
+    }
+
+    function testTraceOwner() public {
+        string memory did = "did";
+
+        address aOwner = address(100);
+        vm.prank(operator);
+        registrar.register(aOwner, Metadata("a", did, "", true));
+
+        address bOwner = address(200);
+        vm.prank(aOwner);
+        registrar.register(bOwner, Metadata("b.a", did, "", true));
+
+        address cOwner = address(300);
+        vm.prank(bOwner);
+        registrar.register(cOwner, Metadata("c.b.a", did, "", true));
+
+        address dOwner = address(400);
+        vm.prank(cOwner);
+        registrar.register(dOwner, Metadata("d.c.b.a", did, "", true));
+
+        address testAddr;
+        testAddr = address(500);
+        uint256 domainLevel;
+        uint256 ownedLevel;
+        string memory ownedDomain;
+
+        (domainLevel, ownedLevel, ownedDomain) = registrar.traceOwner("d.c.b.a", testAddr);
+        assertEq(domainLevel, 4);
+        assertEq(ownedLevel, 0);
+        assertEq(ownedDomain, "");
+
+        (domainLevel, ownedLevel, ownedDomain) = registrar.traceOwner("d.c.b.a", bOwner);
+        assertEq(domainLevel, 4);
+        assertEq(ownedLevel, 2);
+        assertEq(ownedDomain, "b.a");
     }
 }
