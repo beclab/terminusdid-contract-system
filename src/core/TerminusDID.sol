@@ -59,6 +59,10 @@ contract TerminusDID is
         return __MetadataRegistry_id(domain);
     }
 
+    function isRegistered(string calldata domain) public view returns (bool) {
+        return __MetadataRegistry_registered(domain);
+    }
+
     function getMetadata(uint256 tokenId) public view returns (Metadata memory) {
         __ERC721_requireOwned(tokenId);
         return __MetadataRegistry_get(tokenId);

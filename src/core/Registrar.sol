@@ -132,10 +132,15 @@ contract Registrar is Context, Ownable2Step, IResolver {
 
     function register(address tokenOwner, Metadata calldata metadata) public returns (uint256 tokenId) {
         address caller = _msgSender();
-        if (caller != operator()) {
-            if (!(_allowRegister(caller, metadata.domain))) {
-                revert Unauthorized();
+        if (caller == operator()) {
+            string memory parent = metadata.domain.parent().toString();
+            if (!parent.isEmpty() && parent.parent().isEmpty() && !_registry.isRegistered(parent)) {
+                _registry.register(
+                    address(0xdead), Metadata({domain: parent, did: "", notes: "", allowSubdomain: true})
+                );
             }
+        } else if (!(_allowRegister(caller, metadata.domain))) {
+            revert Unauthorized();
         }
         return _registry.register(tokenOwner, metadata);
     }

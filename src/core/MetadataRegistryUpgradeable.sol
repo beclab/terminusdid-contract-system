@@ -41,6 +41,10 @@ abstract contract MetadataRegistryUpgradeable is Initializable {
         return __MetadataRegistry_getStorage()._data[id];
     }
 
+    function __MetadataRegistry_registered(string memory domain) internal view returns (bool) {
+        return !__MetadataRegistry_getStorage()._data[domain.tokenId()].domain.isEmpty();
+    }
+
     function __MetadataRegistry_id(string memory domain) internal pure returns (uint256) {
         return domain.tokenId();
     }
