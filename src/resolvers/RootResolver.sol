@@ -20,8 +20,6 @@ contract RootResolver is IResolver, Context {
 
     error Asn1DecodeError(Asn1Decode.ErrorCode errorCode);
 
-    error InvalidIpV4Length();
-
     modifier authorizationCheck(string memory domain) {
         address caller = _msgSender();
         if (caller != _operator) {
@@ -59,7 +57,7 @@ contract RootResolver is IResolver, Context {
         return address(_registry);
     }
 
-    function operartor() external view returns (address) {
+    function operator() external view returns (address) {
         return _operator;
     }
 
@@ -73,37 +71,41 @@ contract RootResolver is IResolver, Context {
             http://luca.ntop.org/Teaching/Appunti/asn1.html
     */
     function setRsaPubKey(string calldata domain, bytes calldata pubKey) external authorizationCheck(domain) {
-        Asn1Decode.ErrorCode errorCode;
-        uint256 sequenceRange;
-        (errorCode, sequenceRange) = pubKey.rootOfSequenceStringAt(0);
-        if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            revert Asn1DecodeError(errorCode);
-        }
-        bytes memory sequence = pubKey.bytesAt(sequenceRange);
+        if (pubKey.length == 0) {
+            _registrar.setTag(domain, _RSA_PUBKEY_RESOLVER, "");
+        } else {
+            Asn1Decode.ErrorCode errorCode;
+            uint256 sequenceRange;
+            (errorCode, sequenceRange) = pubKey.rootOfSequenceStringAt(0);
+            if (errorCode != Asn1Decode.ErrorCode.NoError) {
+                revert Asn1DecodeError(errorCode);
+            }
+            bytes memory sequence = pubKey.bytesAt(sequenceRange);
 
-        uint256 modulusRange;
-        (errorCode, modulusRange) = sequence.root();
-        if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            revert Asn1DecodeError(errorCode);
-        }
+            uint256 modulusRange;
+            (errorCode, modulusRange) = sequence.root();
+            if (errorCode != Asn1Decode.ErrorCode.NoError) {
+                revert Asn1DecodeError(errorCode);
+            }
 
-        (errorCode,) = sequence.uintBytesAt(modulusRange);
-        if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            revert Asn1DecodeError(errorCode);
-        }
+            (errorCode,) = sequence.uintBytesAt(modulusRange);
+            if (errorCode != Asn1Decode.ErrorCode.NoError) {
+                revert Asn1DecodeError(errorCode);
+            }
 
-        uint256 publicExponentRange;
-        (errorCode, publicExponentRange) = sequence.nextSiblingOf(modulusRange);
-        if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            revert Asn1DecodeError(errorCode);
-        }
+            uint256 publicExponentRange;
+            (errorCode, publicExponentRange) = sequence.nextSiblingOf(modulusRange);
+            if (errorCode != Asn1Decode.ErrorCode.NoError) {
+                revert Asn1DecodeError(errorCode);
+            }
 
-        (errorCode,) = sequence.uintAt(publicExponentRange);
-        if (errorCode != Asn1Decode.ErrorCode.NoError) {
-            revert Asn1DecodeError(errorCode);
-        }
+            (errorCode,) = sequence.uintAt(publicExponentRange);
+            if (errorCode != Asn1Decode.ErrorCode.NoError) {
+                revert Asn1DecodeError(errorCode);
+            }
 
-        _registrar.setTag(domain, _RSA_PUBKEY_RESOLVER, pubKey);
+            _registrar.setTag(domain, _RSA_PUBKEY_RESOLVER, pubKey);
+        }
     }
 
     function rsaPubKey(uint256 tokenId) external view returns (bytes memory pubKey) {
@@ -115,11 +117,11 @@ contract RootResolver is IResolver, Context {
     The raw bytes data length must be 4.
     */
     function setDnsARecord(string memory domain, bytes4 ipv4) external authorizationCheck(domain) {
-        if (ipv4.length != 4) {
-            revert InvalidIpV4Length();
+        if (ipv4 == bytes4(0)) {
+            _registrar.setTag(domain, _DNS_A_RECORD_RESOLVER, "");
+        } else {
+            _registrar.setTag(domain, _DNS_A_RECORD_RESOLVER, bytes.concat(ipv4));
         }
-
-        _registrar.setTag(domain, _DNS_A_RECORD_RESOLVER, bytes.concat(ipv4));
     }
 
     function dnsARecord(uint256 tokenId) external view returns (bytes4 ipv4) {

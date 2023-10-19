@@ -16,8 +16,6 @@ contract CustomResolver is IResolver, Context {
 
     error Unauthorized();
 
-    error InvalidId();
-
     constructor(address registrar_, address registry_) {
         _registrar = IRegistrar(registrar_);
         _registry = ITerminusDID(registry_);
@@ -39,17 +37,17 @@ contract CustomResolver is IResolver, Context {
     }
 
     function setStaffId(string calldata domain, uint32 id) external {
-        if (id == 0) {
-            revert InvalidId();
-        }
-
         address caller = _msgSender();
         (, uint256 ownedLevel,) = _registrar.traceOwner(domain, caller);
         if (ownedLevel == 0) {
             revert Unauthorized();
         }
 
-        _registrar.setTag(domain, _STAFF_ID, bytes.concat(bytes4(id)));
+        if (id == 0) {
+            _registrar.setTag(domain, _STAFF_ID, "");
+        } else {
+            _registrar.setTag(domain, _STAFF_ID, bytes.concat(bytes4(id)));
+        }
     }
 
     function staffId(string calldata domain) external view returns (uint32 id) {

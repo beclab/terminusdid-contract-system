@@ -41,6 +41,12 @@ contract TerminusDIDTest is Test {
         registrar.setRootResolver(address(rootResolver));
     }
 
+    function testBasis() public {
+        assertEq(rootResolver.registrar(), address(registrar));
+        assertEq(rootResolver.registry(), address(registryProxy));
+        assertEq(rootResolver.operator(), operator);
+    }
+
     function testKeyGTPublicResolverLimit() public {
         uint256 _ROOT_KEY_LIMIT = uint256(type(uint16).max);
         uint256 keyNum = 0x1234567;
@@ -57,7 +63,12 @@ contract TerminusDIDTest is Test {
         assertEq(selector, bytes4(0xffffffff));
     }
 
-    function testSetRsaPubKey() public {
+    function testTagGetter() public {
+        assertEq(rootResolver.tagGetter(0x12), rootResolver.rsaPubKey.selector);
+        assertEq(rootResolver.tagGetter(0x13), rootResolver.dnsARecord.selector);
+    }
+
+    function testSetAndRemoveRsaPubKey() public {
         bytes memory value =
             hex"3082010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001";
 
@@ -68,9 +79,17 @@ contract TerminusDIDTest is Test {
 
         vm.prank(operator);
         rootResolver.setRsaPubKey(domain, value);
-        bytes memory valueRet = rootResolver.rsaPubKey(domain.tokenId());
-
+        bytes memory valueRet;
+        valueRet = rootResolver.rsaPubKey(domain.tokenId());
         assertEq(value, valueRet);
+
+        vm.prank(operator);
+        rootResolver.setRsaPubKey(domain, "");
+        assertEq(rootResolver.rsaPubKey(domain.tokenId()), "");
+
+        (bool exists, bytes memory originData) = registryProxy.getTagValue(domain.tokenId(), 0x12);
+        assertEq(exists, false);
+        assertEq(originData, "");
     }
 
     function testSetInvalidRsaPubKey() public {
@@ -86,7 +105,7 @@ contract TerminusDIDTest is Test {
         rootResolver.setRsaPubKey("a", value);
     }
 
-    function testSetDnsARecord() public {
+    function testRemoveDnsARecord() public {
         bytes4 value;
         value = hex"ffffffff";
 
@@ -100,5 +119,43 @@ contract TerminusDIDTest is Test {
 
         bytes4 valueRet = rootResolver.dnsARecord(domain.tokenId());
         assertEq(value, valueRet);
+
+        vm.prank(operator);
+        rootResolver.setDnsARecord(domain, bytes4(0));
+        assertEq(rootResolver.dnsARecord(domain.tokenId()), bytes4(0));
+
+        (bool exists, bytes memory originData) = registryProxy.getTagValue(domain.tokenId(), 0x13);
+        assertEq(exists, false);
+        assertEq(originData, "");
+    }
+
+    function testAuthorizationCheck() public {
+        address aOwner = address(100);
+        vm.prank(operator);
+        registrar.register(aOwner, Metadata("a", "did", "", true));
+
+        address bOwner = address(200);
+        vm.prank(operator);
+        registrar.register(bOwner, Metadata("b.a", "did", "", true));
+
+        string memory domain;
+
+        domain = "b.a";
+        vm.prank(operator);
+        rootResolver.setDnsARecord(domain, hex"ffffffff");
+        assertEq(rootResolver.dnsARecord(domain.tokenId()), hex"ffffffff");
+
+        vm.prank(aOwner);
+        rootResolver.setDnsARecord(domain, hex"ffffffaa");
+        assertEq(rootResolver.dnsARecord(domain.tokenId()), hex"ffffffaa");
+
+        vm.prank(bOwner);
+        rootResolver.setDnsARecord(domain, hex"ffffffbb");
+        assertEq(rootResolver.dnsARecord(domain.tokenId()), hex"ffffffbb");
+
+        address notOwner = address(300);
+        vm.prank(notOwner);
+        vm.expectRevert(RootResolver.Unauthorized.selector);
+        rootResolver.setDnsARecord(domain, hex"ffffffcc");
     }
 }

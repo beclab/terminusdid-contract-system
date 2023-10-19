@@ -45,6 +45,7 @@ contract RegistrarTest is Test {
     function testBasis() public {
         assertEq(registrar.registry(), address(registryProxy));
         assertEq(registrar.rootResolver(), address(rootResolver));
+        assertEq(registrar.operator(), address(operator));
         // only owner can set
         address notOwner = address(100);
         vm.prank(notOwner);
@@ -130,6 +131,50 @@ contract RegistrarTest is Test {
 
         address testOwnerRet = registryProxy.ownerOf(tokenId);
         assertEq(testOwner, testOwnerRet);
+    }
+
+    function testRegisterSecondLevelDirectly() public {
+        address owner = address(100);
+        address deadAddr = address(0xdead);
+        string memory secondLevelDomain = "max.io";
+        string memory topLevelDomain = "io";
+        vm.prank(operator);
+        registrar.register(owner, Metadata(secondLevelDomain, "did", "", true));
+
+        Metadata memory metadataRet;
+        address ownerRet;
+
+        metadataRet = registryProxy.getMetadata(secondLevelDomain.tokenId());
+
+        assertEq(secondLevelDomain, metadataRet.domain);
+        assertEq("did", metadataRet.did);
+        assertEq("", metadataRet.notes);
+        assertEq(true, metadataRet.allowSubdomain);
+
+        ownerRet = registryProxy.ownerOf(secondLevelDomain.tokenId());
+        assertEq(owner, ownerRet);
+
+        metadataRet = registryProxy.getMetadata(topLevelDomain.tokenId());
+
+        assertEq(topLevelDomain, metadataRet.domain);
+        assertEq("", metadataRet.did);
+        assertEq("", metadataRet.notes);
+        assertEq(true, metadataRet.allowSubdomain);
+
+        ownerRet = registryProxy.ownerOf(topLevelDomain.tokenId());
+        assertEq(deadAddr, ownerRet);
+
+        // only operator is allow to do so
+        address notOperator = address(200);
+        vm.prank(notOperator);
+        string memory notExistDomain = "operator";
+        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, notExistDomain.tokenId()));
+        registrar.register(notOperator, Metadata("not.operator", "did", "", true));
+
+        // not allow to register 3rd level domain directly
+        vm.prank(operator);
+        vm.expectRevert(MetadataRegistryUpgradeable.UnregisteredParentDomain.selector);
+        registrar.register(owner, Metadata("3rd.level.domain", "did", "", true));
     }
 
     function testRegisterVeryLongDomainName() public {
@@ -276,10 +321,26 @@ contract RegistrarTest is Test {
         registrar.setTag(domain, key, value);
 
         uint256 tokenId = domain.tokenId();
-        (bool exists, bytes memory valueRet) = registryProxy.getTagValue(tokenId, key);
+        bool exists;
+        bytes memory valueRet;
+        (exists, valueRet) = registryProxy.getTagValue(tokenId, key);
 
         assertEq(exists, true);
         assertEq(valueRet, value);
+
+        // operator can set any tag, even not defined by resolver
+        vm.prank(operator);
+        registrar.setTag(domain, 0x100, bytes("little baby"));
+        (exists, valueRet) = registryProxy.getTagValue(tokenId, 0x100);
+        assertEq(exists, true);
+        assertEq(valueRet, bytes("little baby"));
+
+        // operator can delete tag
+        vm.prank(operator);
+        registrar.setTag(domain, 0x100, "");
+        (exists, valueRet) = registryProxy.getTagValue(tokenId, 0x100);
+        assertEq(exists, false);
+        assertEq(valueRet, "");
     }
 
     function testSetTagForMultiLevels() public {
@@ -351,6 +412,27 @@ contract RegistrarTest is Test {
         registrar.setTag(notExistParentDomain, key, value);
     }
 
+    function testSetTagByResolver() public {
+        address aOwner = address(100);
+        string memory did = "did";
+        string memory domain = "a";
+        vm.prank(operator);
+        registrar.register(aOwner, Metadata(domain, did, "", true));
+
+        uint256 key = 0x12;
+        bytes memory value =
+            hex"3082010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001";
+
+        vm.prank(address(rootResolver));
+        registrar.setTag(domain, key, value);
+
+        uint256 tokenId = domain.tokenId();
+        (bool exists, bytes memory valueRet) = registryProxy.getTagValue(tokenId, key);
+
+        assertEq(exists, true);
+        assertEq(valueRet, value);
+    }
+
     /*//////////////////////////////////////////////////////////////
                              Other tools
     //////////////////////////////////////////////////////////////*/
@@ -378,6 +460,79 @@ contract RegistrarTest is Test {
         key = 0x14;
         _resolver = registrar.resolverOf("b.a", key);
         assertEq(_resolver, address(rootResolver));
+    }
+
+    function testGetterOf() public {
+        uint256 key = 0x13;
+        bytes memory value = hex"c0a80101";
+        string memory did = "did";
+
+        address aOwner = address(100);
+        vm.prank(operator);
+        registrar.register(aOwner, Metadata("a", did, "", true));
+        vm.prank(operator);
+        registrar.setTag("a", key, value);
+
+        address bOwner = address(200);
+        vm.prank(operator);
+        registrar.register(bOwner, Metadata("b.a", did, "", true));
+        vm.prank(operator);
+        registrar.setTag("b.a", key, value);
+
+        function(uint256) external view getter;
+        getter = registrar.getterOf("b.a", key);
+        assertEq(getter.address, address(rootResolver));
+        assertEq(getter.selector, rootResolver.dnsARecord.selector);
+
+        getter = registrar.getterOf("a", key);
+        assertEq(getter.address, address(rootResolver));
+        assertEq(getter.selector, rootResolver.dnsARecord.selector);
+
+        // reserved key
+        getter = registrar.getterOf("b.a", 0x14);
+        assertEq(getter.address, address(rootResolver));
+        assertEq(getter.selector, hex"ffffffff");
+
+        // unsupport key
+        string memory domain = "b.a";
+        vm.expectRevert(abi.encodeWithSelector(Registrar.UnsupportedTag.selector, domain.tokenId(), 0xffffff));
+        getter = registrar.getterOf(domain, 0xffffff);
+    }
+
+    function testGetterOfWithCustomResolver() public {
+        string memory did = "did";
+
+        address aOwner = address(100);
+        vm.prank(operator);
+        registrar.register(aOwner, Metadata("a", did, "", true));
+
+        address bOwner = address(200);
+        vm.prank(aOwner);
+        registrar.register(bOwner, Metadata("b.a", did, "", true));
+
+        address cOwner = address(300);
+        vm.prank(bOwner);
+        registrar.register(cOwner, Metadata("c.b.a", did, "", true));
+
+        CustomResolver customResolver = new CustomResolver(address(registrar), address(registryProxy));
+        vm.prank(cOwner);
+        registrar.setCustomResolver("c.b.a", address(customResolver));
+
+        // parent domain cannot use custom resolver defined by subDomain
+        function(uint256) external view getter;
+        string memory domain = "b.a";
+        uint256 keyInCustomResolver = 0xffff01;
+        vm.expectRevert(
+            abi.encodeWithSelector(Registrar.UnsupportedTag.selector, domain.tokenId(), keyInCustomResolver)
+        );
+        getter = registrar.getterOf(domain, keyInCustomResolver);
+
+        // sudDomain can use custom resolver defined by parent domain
+        vm.prank(aOwner);
+        registrar.setCustomResolver("a", address(customResolver));
+        getter = registrar.getterOf(domain, keyInCustomResolver);
+        assertEq(getter.address, address(customResolver));
+        assertEq(getter.selector, customResolver.staffId.selector);
     }
 
     function testSetCustomResolver() public {
