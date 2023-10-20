@@ -101,7 +101,7 @@ contract TerminusDIDTest is Test {
         registrar.register(aOwner, Metadata("a", "did", "", true));
 
         vm.prank(operator);
-        vm.expectRevert(abi.encodeWithSelector(RootResolver.Asn1DecodeError.selector, 4));
+        vm.expectRevert(bytes("Asn1Decode: not type SEQUENCE STRING"));
         rootResolver.setRsaPubKey("a", value);
     }
 

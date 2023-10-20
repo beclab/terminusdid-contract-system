@@ -18,8 +18,6 @@ contract RootResolver is IResolver, Context {
 
     error Unauthorized();
 
-    error Asn1DecodeError(Asn1Decode.ErrorCode errorCode);
-
     modifier authorizationCheck(string memory domain) {
         address caller = _msgSender();
         if (caller != _operator) {
@@ -74,35 +72,13 @@ contract RootResolver is IResolver, Context {
         if (pubKey.length == 0) {
             _registrar.setTag(domain, _RSA_PUBKEY_RESOLVER, "");
         } else {
-            Asn1Decode.ErrorCode errorCode;
             uint256 sequenceRange;
-            (errorCode, sequenceRange) = pubKey.rootOfSequenceStringAt(0);
-            if (errorCode != Asn1Decode.ErrorCode.NoError) {
-                revert Asn1DecodeError(errorCode);
-            }
+            sequenceRange = pubKey.rootOfSequenceStringAt(0);
             bytes memory sequence = pubKey.bytesAt(sequenceRange);
-
-            uint256 modulusRange;
-            (errorCode, modulusRange) = sequence.root();
-            if (errorCode != Asn1Decode.ErrorCode.NoError) {
-                revert Asn1DecodeError(errorCode);
-            }
-
-            (errorCode,) = sequence.uintBytesAt(modulusRange);
-            if (errorCode != Asn1Decode.ErrorCode.NoError) {
-                revert Asn1DecodeError(errorCode);
-            }
-
-            uint256 publicExponentRange;
-            (errorCode, publicExponentRange) = sequence.nextSiblingOf(modulusRange);
-            if (errorCode != Asn1Decode.ErrorCode.NoError) {
-                revert Asn1DecodeError(errorCode);
-            }
-
-            (errorCode,) = sequence.uintAt(publicExponentRange);
-            if (errorCode != Asn1Decode.ErrorCode.NoError) {
-                revert Asn1DecodeError(errorCode);
-            }
+            uint256 modulusRange = sequence.root();
+            sequence.uintBytesAt(modulusRange);
+            uint256 publicExponentRange = sequence.nextSiblingOf(modulusRange);
+            sequence.uintAt(publicExponentRange);
 
             _registrar.setTag(domain, _RSA_PUBKEY_RESOLVER, pubKey);
         }
