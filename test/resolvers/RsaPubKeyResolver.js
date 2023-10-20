@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-var NodeRSA = require('node-rsa');
+const NodeRSA = require('node-rsa');
 const { loadFixture } = require('@nomicfoundation/hardhat-network-helpers');
 const { expect } = require('chai');
 const { ethers } = require('hardhat');
@@ -41,7 +41,7 @@ describe('RsaPubKey test', function () {
         const { publicKey, _ } = crypto.generateKeyPairSync("rsa", {
             modulusLength: length,
         });
-        const pubKeyDer = publicKey.export({ type: 'pkcs1', format: 'der' });
+        const pubKeyDer = publicKey.export({ type: 'spki', format: 'der' });
 
         await registrar.connect(operator).register(operator.address, { domain: "a", did: "did", notes: "", allowSubdomain: true })
 
@@ -61,12 +61,16 @@ describe('RsaPubKey test', function () {
     });
 
     describe('invalid pubKey test', async function () {
+        // generate rsa key pair online tool: https://www.lddgo.net/encrypt/rsakey
         it('valid pubKey', async function () {
             const { rootResolver, registrar, operator } = await loadFixture(deployTokenFixture);
-            const pubKeyDer = Buffer.from('3082010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001', 'hex');
+            const validPubKeyInPEM = `MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAMCtKL288IuZLzrxWGlD7TeR7v0Zml2D
+            OQXL2wGoJrJrZzXu/fTZZ3z/jiTfP+ABwTYdS854EECI7GjFOObld0UCAwEAAQ==`;
+            const pubKeyDer = Buffer.from(validPubKeyInPEM, 'base64');
+            expect(pubKeyDer.toString('hex')).to.equal('305c300d06092a864886f70d0101010500034b003048024100c0ad28bdbcf08b992f3af1586943ed3791eefd199a5d833905cbdb01a826b26b6735eefdf4d9677cff8e24df3fe001c1361d4bce78104088ec68c538e6e577450203010001');
 
-            var key = new NodeRSA(null);
-            key.importKey(pubKeyDer, 'pkcs1-public-der');
+            const key = new NodeRSA(null);
+            key.importKey(pubKeyDer, 'pkcs8-public-der');
 
             await registrar.connect(operator).register(operator.address, { domain: "a", did: "did", notes: "", allowSubdomain: true })
             await rootResolver.connect(operator).setRsaPubKey("a", pubKeyDer);
@@ -76,10 +80,10 @@ describe('RsaPubKey test', function () {
 
         it('invalid sequence length', async function () {
             const { rootResolver, registrar, operator } = await loadFixture(deployTokenFixture);
-            const pubKeyDer = Buffer.from('3083010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001', 'hex');
+            const pubKeyDer = Buffer.from('305c300d06092a864886f70d0101010500034b003048024100c0ad28bdbcf08b992f3af1586943ed3791eefd199a5d833905cbdb01a826b26b6735eefdf4d9677cff8e24df3fe001c1361d4bce78104088ec68c538e6e5774', 'hex');
 
-            var key = new NodeRSA(null);
-            expect(key.importKey.bind(key, pubKeyDer, 'pkcs1-public-der')).to.throw('Expected 0x2: got 0x82');
+            const key = new NodeRSA(null);
+            expect(key.importKey.bind(key, pubKeyDer, 'pkcs8-public-der')).to.throw('data must be a node Buffer');
 
             await registrar.connect(operator).register(operator.address, { domain: "a", did: "did", notes: "", allowSubdomain: true })
             await expect(rootResolver.connect(operator).setRsaPubKey("a", pubKeyDer)).to.be.revertedWith("Asn1Decode: wrong length")
@@ -87,7 +91,7 @@ describe('RsaPubKey test', function () {
 
         it('invalid sequence type', async function () {
             const { rootResolver, registrar, operator } = await loadFixture(deployTokenFixture);
-            const pubKeyDer = Buffer.from('4083010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001', 'hex');
+            const pubKeyDer = Buffer.from('305c300d06092a864886f70d0101010500034b004048024100c0ad28bdbcf08b992f3af1586943ed3791eefd199a5d833905cbdb01a826b26b6735eefdf4d9677cff8e24df3fe001c1361d4bce78104088ec68c538e6e577450203010001', 'hex');
 
             await registrar.connect(operator).register(operator.address, { domain: "a", did: "did", notes: "", allowSubdomain: true })
             await expect(rootResolver.connect(operator).setRsaPubKey("a", pubKeyDer)).to.be.revertedWith("Asn1Decode: not type SEQUENCE STRING")
@@ -95,10 +99,10 @@ describe('RsaPubKey test', function () {
 
         it('invalid modulus type', async function () {
             const { rootResolver, registrar, operator } = await loadFixture(deployTokenFixture);
-            const pubKeyDer = Buffer.from('3082010a0382010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001', 'hex');
+            const pubKeyDer = Buffer.from('305c300d06092a864886f70d0101010500034b003048034100c0ad28bdbcf08b992f3af1586943ed3791eefd199a5d833905cbdb01a826b26b6735eefdf4d9677cff8e24df3fe001c1361d4bce78104088ec68c538e6e577450203010001', 'hex');
 
-            var key = new NodeRSA(null);
-            expect(key.importKey.bind(key, pubKeyDer, 'pkcs1-public-der')).to.throw('Expected 0x2: got 0x3');
+            const key = new NodeRSA(null);
+            expect(key.importKey.bind(key, pubKeyDer, 'pkcs8-public-der')).to.throw('Expected 0x2: got 0x3');
 
             await registrar.connect(operator).register(operator.address, { domain: "a", did: "did", notes: "", allowSubdomain: true })
             await expect(rootResolver.connect(operator).setRsaPubKey("a", pubKeyDer)).to.be.revertedWith("Asn1Decode: not type INTEGER")
@@ -106,10 +110,10 @@ describe('RsaPubKey test', function () {
 
         it('invalid publicExponent type', async function () {
             const { rootResolver, registrar, operator } = await loadFixture(deployTokenFixture);
-            const pubKeyDer = Buffer.from('3082010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0303010001', 'hex');
+            const pubKeyDer = Buffer.from('305c300d06092a864886f70d0101010500034b003048024100c0ad28bdbcf08b992f3af1586943ed3791eefd199a5d833905cbdb01a826b26b6735eefdf4d9677cff8e24df3fe001c1361d4bce78104088ec68c538e6e577450903010001', 'hex');
 
-            var key = new NodeRSA(null);
-            expect(key.importKey.bind(key, pubKeyDer, 'pkcs1-public-der')).to.throw('Expected 0x2: got 0x3');
+            const key = new NodeRSA(null);
+            expect(key.importKey.bind(key, pubKeyDer, 'pkcs8-public-der')).to.throw('Expected 0x2: got 0x9');
 
             await registrar.connect(operator).register(operator.address, { domain: "a", did: "did", notes: "", allowSubdomain: true })
             await expect(rootResolver.connect(operator).setRsaPubKey("a", pubKeyDer)).to.be.revertedWith("Asn1Decode: not type INTEGER")

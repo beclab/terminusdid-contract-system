@@ -71,6 +71,11 @@ library Asn1Decode {
         return _readNodeLength(der, ptr.ixf());
     }
 
+    function rootOfObjectIdentifierAt(bytes memory der, uint256 ptr) internal pure returns (uint256) {
+        require(der[ptr.ixs()] == 0x06, "Asn1Decode: not type OID");
+        return _readNodeLength(der, ptr.ixf());
+    }
+
     /*
      * @dev Get the next sibling node
      * @param der The DER-encoded ASN1 structure

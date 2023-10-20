@@ -2,12 +2,17 @@
 pragma solidity 0.8.21;
 
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
+import {BytesUtils} from "ens-contracts/dnssec-oracle/BytesUtils.sol";
 import {IResolver} from "./IResolver.sol";
 import {ITerminusDID, IRegistrar} from "../utils/Interfaces.sol";
 import {Asn1Decode} from "../utils/Asn1Decode.sol";
 
 contract RootResolver is IResolver, Context {
     using Asn1Decode for bytes;
+    using BytesUtils for bytes;
+
+    // http://oid-info.com/get/1.2.840.113549.1.1.1
+    bytes public constant _OID_PKCS = hex"2a864886f70d010101";
 
     uint256 private constant _RSA_PUBKEY_RESOLVER = 0x12;
     uint256 private constant _DNS_A_RECORD_RESOLVER = 0x13;
@@ -60,25 +65,45 @@ contract RootResolver is IResolver, Context {
     }
 
     /*
-    support RSA Pkcs1 ASN.1 format.
-    RSAPublicKey ::= SEQUENCE {
-        modulus           INTEGER,  -- n
-        publicExponent    INTEGER   -- e
-    }
-    refs to: https://www.rfc-editor.org/rfc/rfc3447#appendix-A.1
-            http://luca.ntop.org/Teaching/Appunti/asn1.html
+    RSAPublicKey support RSA Pkcs8 ASN.1 format:
+    EncryptedPrivateKeyInfo SEQUENE
+        encryptionAlgorithm SEQUENCE
+            algorithm OBJECT IDENTIFIER
+            parameters
+        encryptedData BIT STRING
+            SEQUENCE
+                INTEGER -- modulus
+                INTEGER -- exponent
     */
     function setRsaPubKey(string calldata domain, bytes calldata pubKey) external authorizationCheck(domain) {
         if (pubKey.length == 0) {
             _registrar.setTag(domain, _RSA_PUBKEY_RESOLVER, "");
         } else {
-            uint256 sequenceRange;
-            sequenceRange = pubKey.rootOfSequenceStringAt(0);
-            bytes memory sequence = pubKey.bytesAt(sequenceRange);
-            uint256 modulusRange = sequence.root();
-            sequence.uintBytesAt(modulusRange);
-            uint256 publicExponentRange = sequence.nextSiblingOf(modulusRange);
-            sequence.uintAt(publicExponentRange);
+            uint256 encryptedPrivateKeyInfoRange = pubKey.rootOfSequenceStringAt(0);
+            bytes memory encryptedPrivateKeyInfo = pubKey.bytesAt(encryptedPrivateKeyInfoRange);
+
+            uint256 encryptionAlgorithmRange = encryptedPrivateKeyInfo.rootOfSequenceStringAt(0);
+            {
+                bytes memory encryptionAlgorithm = encryptedPrivateKeyInfo.bytesAt(encryptionAlgorithmRange);
+
+                uint256 algorithmRange = encryptionAlgorithm.rootOfObjectIdentifierAt(0);
+                bytes memory algorithm = encryptionAlgorithm.bytesAt(algorithmRange);
+                require(algorithm.equals(_OID_PKCS), "Rsa pub key parsing: not PKCS format");
+            }
+
+            {
+                uint256 encryptedDataRange = encryptedPrivateKeyInfo.nextSiblingOf(encryptionAlgorithmRange);
+                bytes memory encryptedData = encryptedPrivateKeyInfo.bitstringAt(encryptedDataRange);
+
+                uint256 sequenceRange = encryptedData.rootOfSequenceStringAt(0);
+                bytes memory sequence = encryptedData.bytesAt(sequenceRange);
+
+                uint256 modulusRange = sequence.root();
+                sequence.uintBytesAt(modulusRange);
+
+                uint256 publicExponentRange = sequence.nextSiblingOf(modulusRange);
+                sequence.uintAt(publicExponentRange);
+            }
 
             _registrar.setTag(domain, _RSA_PUBKEY_RESOLVER, pubKey);
         }
