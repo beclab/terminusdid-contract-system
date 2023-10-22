@@ -5,8 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {RootResolver} from "../../src/resolvers/RootResolver.sol";
 import {CustomResolver} from "../../src/resolvers/examples/CustomResolver.sol";
+import {BadCustomResolver} from "../mocks/BadCustomResolver.sol";
 import {EmptyContract} from "../mocks/EmptyContract.sol";
-import {InvalidCustomResolver} from "../mocks/InvalidCustomResolver.sol";
 import {TerminusDID} from "../../src/core/TerminusDID.sol";
 import {Registrar} from "../../src/core/Registrar.sol";
 import {Metadata} from "../../src/core/MetadataRegistryUpgradeable.sol";
@@ -157,5 +157,36 @@ contract TerminusDIDTest is Test {
         vm.prank(notOwner);
         vm.expectRevert(RootResolver.Unauthorized.selector);
         rootResolver.setDnsARecord(domain, hex"ffffffcc");
+    }
+
+    function testSetStaffId() public {
+        string memory domain = "a";
+
+        address aOwner = address(100);
+        vm.prank(operator);
+        registrar.register(aOwner, Metadata(domain, "did", "", true));
+
+        vm.prank(aOwner);
+        registrar.setCustomResolver(domain, address(customResolver));
+
+        assertEq(registrar.customResolver(domain.tokenId()), address(customResolver));
+
+        vm.prank(aOwner);
+        customResolver.setStaffId(domain, 0x0001);
+        assertEq(customResolver.staffId(domain.tokenId()), 0x0001);
+
+        BadCustomResolver badCustomResolver = new BadCustomResolver(address(registrar), address(registryProxy));
+        vm.prank(aOwner);
+        registrar.setCustomResolver(domain, address(badCustomResolver));
+
+        assertEq(registrar.customResolver(domain.tokenId()), address(badCustomResolver));
+
+        vm.prank(aOwner);
+        vm.expectRevert(Registrar.Unauthorized.selector);
+        badCustomResolver.setStaffId(domain, 0x0001);
+
+        vm.prank(aOwner);
+        vm.expectRevert(abi.encodeWithSelector(Registrar.UnsupportedTag.selector, domain.tokenId(), 0xffff01));
+        customResolver.setStaffId(domain, 0x0001);
     }
 }

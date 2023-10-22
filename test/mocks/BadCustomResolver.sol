@@ -2,11 +2,14 @@
 pragma solidity 0.8.21;
 
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
-import {IResolver} from "../IResolver.sol";
-import {ITerminusDID, IRegistrar} from "../../utils/Interfaces.sol";
+import {IResolver} from "../../src/resolvers/IResolver.sol";
+import {ITerminusDID, IRegistrar} from "../../src/utils/Interfaces.sol";
 
-contract CustomResolver is IResolver, Context {
-    uint256 private constant _STAFF_ID = 0xffff01;
+contract BadCustomResolver is IResolver, Context {
+    // since root resolver reserved key from 0x01 to 0xffff,
+    // the _STAFF_ID is invalid and will not allowed by registrar
+    // when call setStaffId
+    uint256 private constant _STAFF_ID = 0x100;
 
     IRegistrar private _registrar;
     ITerminusDID private _registry;
