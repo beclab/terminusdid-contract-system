@@ -4,7 +4,6 @@ require("hardhat-preprocessor");
 require("dotenv").config();
 const fs = require("fs")
 
-const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 
 function getRemappings() {
@@ -25,13 +24,27 @@ module.exports = {
                         enabled: true,
                         runs: 200,
                     },
+                    viaIR: true,
                 },
             }
         ],
     },
     networks: {
+        hardhat: {
+            allowUnlimitedContractSize: true,
+        },
         goerli: {
-            url: `https://eth-goerli.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
+            url: `https://ethereum-goerli.publicnode.com`,
+            gas: 15000000,
+            accounts: [PRIVATE_KEY]
+        },
+        op_sepolia: {
+            url: `https://sepolia.optimism.io`,
+            gas: 15000000,
+            accounts: [PRIVATE_KEY]
+        },
+        op: {
+            url: `https://mainnet.optimism.io`,
             gas: 15000000,
             accounts: [PRIVATE_KEY]
         }
@@ -56,6 +69,9 @@ module.exports = {
         }),
     },
     addresses: {
-        rootResolver: "0x25B28e17e75F44fF2275F2ba8923ce69CECa73D8",
+        op_sepolia: {
+            rootTagger: "0xaA5bE49799b6A71Eda74d22D01F7A808aFf41b3f",
+            terminusDIDProxy: "0x4c8c98e652d6a01494971a8faF5d3b68338f9ED4"
+        }
     }
 };

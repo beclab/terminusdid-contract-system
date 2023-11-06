@@ -10,13 +10,13 @@ describe('TerminusDID test', function () {
     async function deployTokenFixture() {
         const [deployer] = await getSigners();
         let TerminusDID = await getContractFactory('TerminusDID');
-        const name = "TerminusDID";
-        const symbol = "TDID";
+        const name = "TestTerminusDID";
+        const symbol = "TTDID";
 
         terminusDIDProxy = await upgrades.deployProxy(TerminusDID, [name, symbol], { initializer: 'initialize', kind: 'uups', constructorArgs: [], unsafeAllow: ['state-variable-immutable'] })
         await terminusDIDProxy.deployed();
 
-        await terminusDIDProxy.setRegistrar(deployer.address);
+        await terminusDIDProxy.setOperator(deployer.address);
 
         return { terminusDIDProxy, deployer };
     }
@@ -24,7 +24,7 @@ describe('TerminusDID test', function () {
     describe('massive domain register test', function () {
         it('random domain label', async function () {
             const { terminusDIDProxy, deployer } = await loadFixture(deployTokenFixture);
-            expect(await terminusDIDProxy.registrar()).to.equal(deployer.address);
+            expect(await terminusDIDProxy.operator()).to.equal(deployer.address);
 
             const metadata = {
                 did: "did",
