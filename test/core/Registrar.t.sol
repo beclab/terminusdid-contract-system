@@ -489,7 +489,7 @@ contract RegistrarTest is Test {
         assertEq(getter.selector, rootResolver.dnsARecord.selector);
 
         // reserved key
-        getter = registrar.getterOf("b.a", 0x14);
+        getter = registrar.getterOf("b.a", 0x20);
         assertEq(getter.address, address(rootResolver));
         assertEq(getter.selector, hex"ffffffff");
 

@@ -6,7 +6,7 @@ const { ethers } = require('hardhat');
 
 const { BigNumber, utils, constants, getContractFactory, getSigners } = ethers;
 const { AddressZero } = constants;
-const { keccak256, toUtf8Bytes } = utils;
+const { id } = utils;
 
 describe('RsaPubKey test', function () {
     async function deployTokenFixture() {
@@ -127,5 +127,5 @@ describe('RsaPubKey test', function () {
 });
 
 function tokenId(domain) {
-    return BigNumber.from(keccak256(toUtf8Bytes(domain)));
+    return BigNumber.from(id(domain));
 }

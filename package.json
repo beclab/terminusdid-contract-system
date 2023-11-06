@@ -17,6 +17,7 @@
     "typescript": "^5.2.2"
   },
   "devDependencies": {
+    "@metamask/sdk": "^0.12.0",
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.6",
     "@nomicfoundation/hardhat-network-helpers": "^1.0.9",
     "@nomicfoundation/hardhat-toolbox": "^1.0.2",
@@ -30,7 +31,8 @@
     "dotenv": "^16.3.1",
     "hardhat": "^2.11.1",
     "hardhat-preprocessor": "^0.1.5",
-    "node-rsa": "^1.1.1"
+    "node-rsa": "^1.1.1",
+    "qrcode-terminal": "^0.12.0"
   },
   "scripts": {
     "test": "mocha"

@@ -3,6 +3,7 @@ pragma solidity 0.8.21;
 
 interface ITerminusDID {
     function getTagValue(uint256 tokenId, uint256 key) external view returns (bool exists, bytes memory value);
+    function ownerOf(uint256 tokenId) external view returns (address);
 }
 
 interface IRegistrar {

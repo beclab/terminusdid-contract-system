@@ -6,22 +6,37 @@ import {BytesUtils} from "ens-contracts/dnssec-oracle/BytesUtils.sol";
 import {IResolver} from "./IResolver.sol";
 import {ITerminusDID, IRegistrar} from "../utils/Interfaces.sol";
 import {Asn1Decode} from "../utils/Asn1Decode.sol";
+import {SignatureHelper} from "../utils/SignatureHelper.sol";
+import {DomainUtils} from "../utils/DomainUtils.sol";
 
-contract RootResolver is IResolver, Context {
+contract RootResolver is IResolver, SignatureHelper, Context {
     using Asn1Decode for bytes;
     using BytesUtils for bytes;
+    using DomainUtils for string;
 
     // http://oid-info.com/get/1.2.840.113549.1.1.1
     bytes public constant _OID_PKCS = hex"2a864886f70d010101";
 
-    uint256 private constant _RSA_PUBKEY_RESOLVER = 0x12;
-    uint256 private constant _DNS_A_RECORD_RESOLVER = 0x13;
+    uint256 private constant _RSA_PUBKEY = 0x12;
+    uint256 private constant _DNS_A_RECORD = 0x13;
+    uint256 private constant _AUTH_ADDRESSES = 0x14;
 
     address private _operator;
     IRegistrar private _registrar;
     ITerminusDID private _registry;
 
     error Unauthorized();
+    error UnsupportedSigAlgorithm();
+    error SignatureExpired(uint256 expiredAt, uint256 curTimeStamp);
+    error InvalidAddressSignature(address addr, bytes signature);
+    error AddressNotFound(address addr);
+    error AuthAddressNotExists();
+    error AuthAddressAlreadyExists();
+
+    struct AuthAddress {
+        SigAlg algorithm;
+        address addr;
+    }
 
     modifier authorizationCheck(string memory domain) {
         address caller = _msgSender();
@@ -41,10 +56,12 @@ contract RootResolver is IResolver, Context {
     }
 
     function tagGetter(uint256 key) external pure returns (bytes4) {
-        if (key == _RSA_PUBKEY_RESOLVER) {
+        if (key == _RSA_PUBKEY) {
             return this.rsaPubKey.selector;
-        } else if (key == _DNS_A_RECORD_RESOLVER) {
+        } else if (key == _DNS_A_RECORD) {
             return this.dnsARecord.selector;
+        } else if (key == _AUTH_ADDRESSES) {
+            return this.authenticationAddress.selector;
         } else if (key <= 0xffff) {
             return bytes4(0xffffffff);
         } else {
@@ -77,7 +94,7 @@ contract RootResolver is IResolver, Context {
     */
     function setRsaPubKey(string calldata domain, bytes calldata pubKey) external authorizationCheck(domain) {
         if (pubKey.length == 0) {
-            _registrar.setTag(domain, _RSA_PUBKEY_RESOLVER, "");
+            _registrar.setTag(domain, _RSA_PUBKEY, "");
         } else {
             uint256 encryptedPrivateKeyInfoRange = pubKey.rootOfSequenceStringAt(0);
             bytes memory encryptedPrivateKeyInfo = pubKey.bytesAt(encryptedPrivateKeyInfoRange);
@@ -105,30 +122,145 @@ contract RootResolver is IResolver, Context {
                 sequence.uintAt(publicExponentRange);
             }
 
-            _registrar.setTag(domain, _RSA_PUBKEY_RESOLVER, pubKey);
+            _registrar.setTag(domain, _RSA_PUBKEY, pubKey);
         }
     }
 
     function rsaPubKey(uint256 tokenId) external view returns (bytes memory pubKey) {
-        (, pubKey) = _registry.getTagValue(tokenId, _RSA_PUBKEY_RESOLVER);
+        (, pubKey) = _registry.getTagValue(tokenId, _RSA_PUBKEY);
     }
 
     /*
     DNS A record can be represent by 4 bytes, in which each byte represents a number range from 0 to 255.
     The raw bytes data length must be 4.
     */
-    function setDnsARecord(string memory domain, bytes4 ipv4) external authorizationCheck(domain) {
+    function setDnsARecord(string calldata domain, bytes4 ipv4) external authorizationCheck(domain) {
         if (ipv4 == bytes4(0)) {
-            _registrar.setTag(domain, _DNS_A_RECORD_RESOLVER, "");
+            _registrar.setTag(domain, _DNS_A_RECORD, "");
         } else {
-            _registrar.setTag(domain, _DNS_A_RECORD_RESOLVER, bytes.concat(ipv4));
+            _registrar.setTag(domain, _DNS_A_RECORD, bytes.concat(ipv4));
         }
     }
 
     function dnsARecord(uint256 tokenId) external view returns (bytes4 ipv4) {
-        (bool exists, bytes memory value) = _registry.getTagValue(tokenId, _DNS_A_RECORD_RESOLVER);
+        (bool exists, bytes memory value) = _registry.getTagValue(tokenId, _DNS_A_RECORD);
         if (exists) {
             ipv4 = bytes4(value);
+        }
+    }
+
+    /*
+    Authentication addresses are addresses that the domain owner owns its private key
+    */
+    function addAuthenticationAddress(
+        AuthAddressReq calldata authAddressReq,
+        bytes calldata sigFromAddressPrivKey,
+        bytes calldata sigFromDomainOwnerPrivKey
+    ) external {
+        // only support ethereum signature algorithm ECDSA so far
+        if (authAddressReq.algorithm != SigAlg.ECDSA) {
+            revert UnsupportedSigAlgorithm();
+        }
+
+        // signature expired
+        if (block.timestamp > authAddressReq.expiredAt) {
+            revert SignatureExpired(authAddressReq.expiredAt, block.timestamp);
+        }
+
+        // signature check for domain owner
+        address domainOwner = recoverSigner(authAddressReq, sigFromDomainOwnerPrivKey);
+        if (domainOwner != _registry.ownerOf(authAddressReq.domain.tokenId())) {
+            revert Unauthorized();
+        }
+
+        // signature check for auth address
+        if (authAddressReq.addr != recoverSigner(authAddressReq, sigFromAddressPrivKey)) {
+            revert InvalidAddressSignature(authAddressReq.addr, sigFromAddressPrivKey);
+        }
+
+        // new add auth address
+        AuthAddress memory newAddAuthAddr = AuthAddress(authAddressReq.algorithm, authAddressReq.addr);
+
+        // auth addresses data structure: AuthAddress[]
+        // if not exists, set to registry, otherwise append to.
+        (bool exists, bytes memory value) = _registry.getTagValue(authAddressReq.domain.tokenId(), _AUTH_ADDRESSES);
+        if (!exists) {
+            AuthAddress[] memory addrs = new AuthAddress[](1);
+            addrs[0] = newAddAuthAddr;
+            _registrar.setTag(authAddressReq.domain, _AUTH_ADDRESSES, abi.encode(addrs));
+        } else {
+            AuthAddress[] memory curAddrs = abi.decode(value, (AuthAddress[]));
+            AuthAddress[] memory newAddrs = new AuthAddress[](curAddrs.length + 1);
+            for (uint256 i = 0; i < curAddrs.length; i++) {
+                if (curAddrs[i].algorithm == authAddressReq.algorithm && curAddrs[i].addr == authAddressReq.addr) {
+                    revert AuthAddressAlreadyExists();
+                }
+                newAddrs[i] = curAddrs[i];
+            }
+            newAddrs[curAddrs.length] = newAddAuthAddr;
+            _registrar.setTag(authAddressReq.domain, _AUTH_ADDRESSES, abi.encode(newAddrs));
+        }
+    }
+
+    function removeAuthenticationAddress(
+        AuthAddressReq calldata authAddressReq,
+        bytes calldata sigFromDomainOwnerPrivKey
+    ) external {
+        // only support ethereum signature algorithm ECDSA so far
+        if (authAddressReq.algorithm != SigAlg.ECDSA) {
+            revert UnsupportedSigAlgorithm();
+        }
+
+        // signature expired
+        if (block.timestamp > authAddressReq.expiredAt) {
+            revert SignatureExpired(authAddressReq.expiredAt, block.timestamp);
+        }
+
+        // signature check for domain owner
+        address domainOwner = recoverSigner(authAddressReq, sigFromDomainOwnerPrivKey);
+        if (domainOwner != _registry.ownerOf(authAddressReq.domain.tokenId())) {
+            revert Unauthorized();
+        }
+
+        (bool exists, bytes memory value) = _registry.getTagValue(authAddressReq.domain.tokenId(), _AUTH_ADDRESSES);
+        // no tag value at all
+        if (!exists) {
+            revert AuthAddressNotExists();
+        }
+        AuthAddress[] memory curAddrs = abi.decode(value, (AuthAddress[]));
+        bool found;
+        uint256 toDeleteIndex;
+        for (uint256 i = 0; i < curAddrs.length; i++) {
+            if (curAddrs[i].algorithm == authAddressReq.algorithm && curAddrs[i].addr == authAddressReq.addr) {
+                found = true;
+                toDeleteIndex = i;
+                break;
+            }
+        }
+        // no found address to be deleted
+        if (!found) {
+            revert AddressNotFound(authAddressReq.addr);
+        }
+        // found and tag value will be empty after delete the address, delete tag
+        if (found && curAddrs.length == 1) {
+            _registrar.setTag(authAddressReq.domain, _AUTH_ADDRESSES, "");
+            return;
+        }
+        // remove found address
+        AuthAddress[] memory newAddrs = new AuthAddress[](curAddrs.length - 1);
+        for (uint256 i = 0; i < toDeleteIndex; i++) {
+            newAddrs[i] = curAddrs[i];
+        }
+        for (uint256 i = toDeleteIndex + 1; i < curAddrs.length; i++) {
+            newAddrs[i - 1] = curAddrs[i];
+        }
+        _registrar.setTag(authAddressReq.domain, _AUTH_ADDRESSES, abi.encode(newAddrs));
+    }
+
+    function authenticationAddress(uint256 tokenId) external view returns (AuthAddress[] memory addrs) {
+        (bool exists, bytes memory value) = _registry.getTagValue(tokenId, _AUTH_ADDRESSES);
+        if (exists) {
+            addrs = abi.decode(value, (AuthAddress[]));
         }
     }
 }

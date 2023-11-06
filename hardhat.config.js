@@ -56,6 +56,6 @@ module.exports = {
         }),
     },
     addresses: {
-        rootResolver: "0x25B28e17e75F44fF2275F2ba8923ce69CECa73D8",
+        rootResolver: "0xeDd7686113352C145e1757Ee8e48c2e495ebE59E",
     }
 };
