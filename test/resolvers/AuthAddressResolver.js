@@ -10,6 +10,10 @@ const SignatureAlogorithm = {
     ECDSA: 0,
     Others: 1,
 };
+const Action = {
+    Add: 0,
+    Remove: 1,
+}
 const _AUTH_ADDRESSES = 0x14;
 
 describe('Auth address test', function () {
@@ -58,7 +62,8 @@ describe('Auth address test', function () {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            expiredAt: curTsInSeconds() + 100000
+            signAt: curTsInSeconds(),
+            action: Action.Add
         };
 
         const sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
@@ -86,7 +91,8 @@ describe('Auth address test', function () {
                 addr: authAddr.address,
                 algorithm: SignatureAlogorithm.ECDSA,
                 domain: "a",
-                expiredAt: curTsInSeconds() + 100000
+                signAt: curTsInSeconds(),
+                action: Action.Add
             };
 
             const sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
@@ -108,7 +114,8 @@ describe('Auth address test', function () {
             addr: removeAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            expiredAt: curTsInSeconds() + 100000
+            signAt: curTsInSeconds(),
+            action: Action.Remove
         }
         removeSigFromDomainOwner = await domainOwner._signTypedData(domain, types, removeValue);
         await rootResolver.connect(operator).removeAuthenticationAddress(removeValue, removeSigFromDomainOwner);
@@ -125,7 +132,8 @@ describe('Auth address test', function () {
             addr: removeAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            expiredAt: curTsInSeconds() + 100000
+            signAt: curTsInSeconds(),
+            action: Action.Remove
         }
         removeSigFromDomainOwner = await domainOwner._signTypedData(domain, types, removeValue);
         await rootResolver.connect(operator).removeAuthenticationAddress(removeValue, removeSigFromDomainOwner);
@@ -142,7 +150,8 @@ describe('Auth address test', function () {
             addr: removeAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            expiredAt: curTsInSeconds() + 100000
+            signAt: curTsInSeconds(),
+            action: Action.Remove
         }
         removeSigFromDomainOwner = await domainOwner._signTypedData(domain, types, removeValue);
         await rootResolver.connect(operator).removeAuthenticationAddress(removeValue, removeSigFromDomainOwner);
@@ -164,7 +173,8 @@ describe('Auth address test', function () {
             addr: removeAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            expiredAt: curTsInSeconds() + 100000
+            signAt: curTsInSeconds(),
+            action: Action.Remove
         }
         removeSigFromDomainOwner = await domainOwner._signTypedData(domain, types, removeValue);
         await rootResolver.connect(operator).removeAuthenticationAddress(removeValue, removeSigFromDomainOwner);
@@ -174,7 +184,8 @@ describe('Auth address test', function () {
             addr: removeAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            expiredAt: curTsInSeconds() + 100000
+            signAt: curTsInSeconds(),
+            action: Action.Remove
         }
         removeSigFromDomainOwner = await domainOwner._signTypedData(domain, types, removeValue);
         await rootResolver.connect(operator).removeAuthenticationAddress(removeValue, removeSigFromDomainOwner);
@@ -205,7 +216,8 @@ describe('Auth address test', function () {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.Others,
             domain: "a",
-            expiredAt: curTsInSeconds() + 100000
+            signAt: curTsInSeconds(),
+            action: Action.Add
         };
 
         let sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
@@ -219,19 +231,33 @@ describe('Auth address test', function () {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            expiredAt: 0
+            signAt: 0,
+            action: Action.Add
         };
 
         sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
         sigFromAuthAddr = await authAddr._signTypedData(domain, types, value);
-        await expect(rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "SignatureExpired");
+        await expect(rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "SignatureIsValidOnlyInOneHour");
+
+        value = {
+            addr: authAddr.address,
+            algorithm: SignatureAlogorithm.ECDSA,
+            domain: "a",
+            signAt: curTsInSeconds() + 60*60*24,
+            action: Action.Add
+        };
+
+        sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
+        sigFromAuthAddr = await authAddr._signTypedData(domain, types, value);
+        await expect(rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "SignatureIsValidOnlyInOneHour");
 
         // Unauthorized
         value = {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            expiredAt: curTsInSeconds() + 100000
+            signAt: curTsInSeconds(),
+            action: Action.Add
         };
 
         const notOWner = signers[2];
@@ -244,7 +270,8 @@ describe('Auth address test', function () {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            expiredAt: curTsInSeconds() + 100000
+            signAt: curTsInSeconds(),
+            action: Action.Add
         };
 
         const notAuthAddress = signers[3];
@@ -257,7 +284,8 @@ describe('Auth address test', function () {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            expiredAt: curTsInSeconds() + 100000
+            signAt: curTsInSeconds(),
+            action: Action.Add
         };
 
         sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
@@ -269,7 +297,8 @@ describe('Auth address test', function () {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            expiredAt: curTsInSeconds() + 100000
+            signAt: curTsInSeconds(),
+            action: Action.Remove
         };
         sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
         await expect(rootResolver.removeAuthenticationAddress(value, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "AuthAddressNotExists");
@@ -281,7 +310,8 @@ describe('Auth address test', function () {
                 addr: authAddr.address,
                 algorithm: SignatureAlogorithm.ECDSA,
                 domain: "a",
-                expiredAt: curTsInSeconds() + 100000
+                signAt: curTsInSeconds(),
+                action: Action.Add
             };
 
             const sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
@@ -294,7 +324,8 @@ describe('Auth address test', function () {
             addr: removeAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            expiredAt: curTsInSeconds() + 100000
+            signAt: curTsInSeconds(),
+            action: Action.Remove
         };
         sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
         await expect(rootResolver.removeAuthenticationAddress(value, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "AddressNotFound");
@@ -304,13 +335,38 @@ describe('Auth address test', function () {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            expiredAt: curTsInSeconds() + 100000
+            signAt: curTsInSeconds(),
+            action: Action.Add
         };
 
         sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
         sigFromAuthAddr = await authAddr._signTypedData(domain, types, value);
         await rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner);
         await expect(rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "AuthAddressAlreadyExists");
+
+        // Invalid action
+        value = {
+            addr: authAddr.address,
+            algorithm: SignatureAlogorithm.ECDSA,
+            domain: "a",
+            signAt: curTsInSeconds(),
+            action: Action.Remove
+        };
+
+        sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
+        sigFromAuthAddr = await authAddr._signTypedData(domain, types, value);
+        await expect(rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "InvalidAction");
+
+        value = {
+            addr: authAddr.address,
+            algorithm: SignatureAlogorithm.ECDSA,
+            domain: "a",
+            signAt: curTsInSeconds(),
+            action: Action.Add
+        };
+
+        sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
+        await expect(rootResolver.connect(operator).removeAuthenticationAddress(value, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "InvalidAction");
     });
 });
 
@@ -338,7 +394,8 @@ function getTypes() {
             { name: 'addr', type: 'address' },
             { name: 'algorithm', type: 'uint8' },
             { name: 'domain', type: 'string' },
-            { name: 'expiredAt', type: 'uint256' }
+            { name: 'signAt', type: 'uint256' },
+            { name: 'action', type: 'uint8' },
         ]
     };
 }

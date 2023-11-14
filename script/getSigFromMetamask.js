@@ -1,9 +1,14 @@
+require("hardhat");
 const { MetaMaskSDK } = require('@metamask/sdk');
 const qrcode = require('qrcode-terminal');
-
+const config = require("../hardhat.config");
 const SignatureAlogorithm = {
     ECDSA: 0,
 };
+const Action = {
+    Add: 0,
+    Remove: 1,
+}
 
 const options = {
     shouldShimWeb3: false,
@@ -48,6 +53,8 @@ const start = async () => {
     const ethereum = sdk.getProvider();
     console.log(`selected address: ${ethereum.selectedAddress}`);
 
+    const rootResolverAddr = config.addresses.rootResolver;
+
     const msgParams = {
         types: {
             EIP712Domain: [
@@ -60,21 +67,23 @@ const start = async () => {
                 { name: 'addr', type: 'address' },
                 { name: 'algorithm', type: 'uint8' },
                 { name: 'domain', type: 'string' },
-                { name: 'expiredAt', type: 'uint256' }
+                { name: 'signAt', type: 'uint256' },
+                { name: 'action', type: 'uint8' },
             ]
         },
         primaryType: 'AuthAddressReq',
         domain: {
             name: 'DID',
             version: '1',
-            chainId: 5,
-            verifyingContract: "0xeDd7686113352C145e1757Ee8e48c2e495ebE59E"
+            chainId: 420,
+            verifyingContract: rootResolverAddr
         },
         message: {
             addr: "0x40688b08ef03a5250706f6E120cb24Dfb5601B70",
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "new.world",
-            expiredAt: 1762566877
+            signAt: 1762566877,
+            action: Action.Add
         },
     };
 

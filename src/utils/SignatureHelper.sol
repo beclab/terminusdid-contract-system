@@ -3,19 +3,24 @@ pragma solidity 0.8.21;
 
 contract SignatureHelper {
     enum SigAlg {ECDSA}
+    enum Action {
+        Add,
+        Remove
+    }
 
     struct AuthAddressReq {
         address addr;
         SigAlg algorithm;
         string domain;
-        uint256 expiredAt;
+        uint256 signAt;
+        Action action;
     }
 
     bytes32 constant EIP712DOMAIN_TYPEHASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
     bytes32 constant AUTH_ADDRESS_TYPEHASH =
-        keccak256("AuthAddressReq(address addr,uint8 algorithm,string domain,uint256 expiredAt)");
+        keccak256("AuthAddressReq(address addr,uint8 algorithm,string domain,uint256 signAt,uint8 action)");
 
     bytes32 public immutable DOMAIN_SEPARATOR;
 
@@ -44,7 +49,8 @@ contract SignatureHelper {
                         authAddressReq.addr,
                         authAddressReq.algorithm,
                         keccak256(bytes(authAddressReq.domain)),
-                        authAddressReq.expiredAt
+                        authAddressReq.signAt,
+                        authAddressReq.action
                     )
                 )
             )

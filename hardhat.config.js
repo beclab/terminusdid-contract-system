@@ -31,7 +31,12 @@ module.exports = {
     },
     networks: {
         goerli: {
-            url: `https://eth-goerli.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
+            url: `https://ethereum-goerli.publicnode.com`,
+            gas: 15000000,
+            accounts: [PRIVATE_KEY]
+        },
+        op_goerli: {
+            url: `https://optimism-goerli.publicnode.com`,
             gas: 15000000,
             accounts: [PRIVATE_KEY]
         }
@@ -56,6 +61,6 @@ module.exports = {
         }),
     },
     addresses: {
-        rootResolver: "0xeDd7686113352C145e1757Ee8e48c2e495ebE59E",
+        rootResolver: "0x17e4C64d6417bc39393a8153853Bfa126347d0Cb",
     }
 };

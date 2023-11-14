@@ -22,7 +22,7 @@ contract UpdateRootResolver is Script {
 
         RootResolver rootResolver = new RootResolver(address(registrar), address(registryProxy), bot);
         registrar.setRootResolver(address(rootResolver));
-        
+
         vm.stopBroadcast();
     }
 }

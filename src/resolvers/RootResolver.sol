@@ -15,11 +15,14 @@ contract RootResolver is IResolver, SignatureHelper, Context {
     using DomainUtils for string;
 
     // http://oid-info.com/get/1.2.840.113549.1.1.1
-    bytes public constant _OID_PKCS = hex"2a864886f70d010101";
+    bytes private constant _OID_PKCS = hex"2a864886f70d010101";
 
     uint256 private constant _RSA_PUBKEY = 0x12;
     uint256 private constant _DNS_A_RECORD = 0x13;
     uint256 private constant _AUTH_ADDRESSES = 0x14;
+
+    // signature is valid within 1 hour
+    uint256 private constant VALID_SIG_INTERVAL = 60 * 60;
 
     address private _operator;
     IRegistrar private _registrar;
@@ -27,18 +30,19 @@ contract RootResolver is IResolver, SignatureHelper, Context {
 
     error Unauthorized();
     error UnsupportedSigAlgorithm();
-    error SignatureExpired(uint256 expiredAt, uint256 curTimeStamp);
+    error SignatureIsValidOnlyInOneHour(uint256 signAt, uint256 blockchainCurTimeStamp);
     error InvalidAddressSignature(address addr, bytes signature);
     error AddressNotFound(address addr);
     error AuthAddressNotExists();
     error AuthAddressAlreadyExists();
+    error InvalidAction();
 
     struct AuthAddress {
         SigAlg algorithm;
         address addr;
     }
 
-    modifier authorizationCheck(string memory domain) {
+    modifier authorizationCheck(string calldata domain) {
         address caller = _msgSender();
         if (caller != _operator) {
             (, uint256 ownedLevel,) = _registrar.traceOwner(domain, caller);
@@ -162,9 +166,16 @@ contract RootResolver is IResolver, SignatureHelper, Context {
             revert UnsupportedSigAlgorithm();
         }
 
+        // should be add action
+        if (authAddressReq.action != Action.Add) {
+            revert InvalidAction();
+        }
+
         // signature expired
-        if (block.timestamp > authAddressReq.expiredAt) {
-            revert SignatureExpired(authAddressReq.expiredAt, block.timestamp);
+        if (
+            !(block.timestamp >= authAddressReq.signAt && block.timestamp <= authAddressReq.signAt + VALID_SIG_INTERVAL)
+        ) {
+            revert SignatureIsValidOnlyInOneHour(authAddressReq.signAt, block.timestamp);
         }
 
         // signature check for domain owner
@@ -211,11 +222,17 @@ contract RootResolver is IResolver, SignatureHelper, Context {
             revert UnsupportedSigAlgorithm();
         }
 
-        // signature expired
-        if (block.timestamp > authAddressReq.expiredAt) {
-            revert SignatureExpired(authAddressReq.expiredAt, block.timestamp);
+        // should be remove action
+        if (authAddressReq.action != Action.Remove) {
+            revert InvalidAction();
         }
 
+        // signature expired
+        if (
+            !(block.timestamp >= authAddressReq.signAt && block.timestamp <= authAddressReq.signAt + VALID_SIG_INTERVAL)
+        ) {
+            revert SignatureIsValidOnlyInOneHour(authAddressReq.signAt, block.timestamp);
+        }
         // signature check for domain owner
         address domainOwner = recoverSigner(authAddressReq, sigFromDomainOwnerPrivKey);
         if (domainOwner != _registry.ownerOf(authAddressReq.domain.tokenId())) {
