@@ -32,6 +32,19 @@ library ABI {
 
     error InvalidValue();
 
+    modifier releaseMemory() {
+        uint256 p;
+        assembly {
+            p := mload(0x40)
+        }
+
+        _;
+
+        assembly {
+            mstore(0x40, p)
+        }
+    }
+
     function intT(uint16 bits) internal pure returns (bytes2) {
         if (bits & 0x7 == 0) {
             uint16 size = bits >> 3;
@@ -230,12 +243,7 @@ library ABI {
         return value;
     }
 
-    function set(ReflectVar memory self, bytes memory value) internal {
-        uint256 p;
-        assembly {
-            p := mload(0x40)
-        }
-
+    function set(ReflectVar memory self, bytes memory value) internal releaseMemory {
         bytes memory meta = _typeMeta(self.typ, self.i);
 
         uint256 pMeta;
@@ -253,10 +261,6 @@ library ABI {
         uint256 valueEnd = pHead + value.length;
         if (pHead_ != valueEnd && (pHead_ != pTail || pTail_ != valueEnd)) {
             revert InvalidValue();
-        }
-
-        assembly {
-            mstore(0x40, p)
         }
     }
 
@@ -284,12 +288,7 @@ library ABI {
         return len;
     }
 
-    function push(ReflectVar memory self, bytes memory value) internal {
-        uint256 p;
-        assembly {
-            p := mload(0x40)
-        }
-
+    function push(ReflectVar memory self, bytes memory value) internal releaseMemory {
         (bytes memory typ, uint256 i) = (self.typ, self.i);
         (bytes32 slot, uint256 offset) = _align(self.slot, self.offset);
 
@@ -320,10 +319,6 @@ library ABI {
             set(elem, value);
         } else {
             revert InvalidOp();
-        }
-
-        assembly {
-            mstore(0x40, p)
         }
     }
 
@@ -965,7 +960,7 @@ library ABI {
         } else if (t == FIXED_ARRAY_T) {
             uint16 len = _readArrayTupleLength(typ, i + 1);
             uint256 pArray = p;
-            (p, i, isDynamic, size) = _typeMeta(p + 3, typ, i + 3);
+            (p, i, isDynamic, size) = _typeMeta(p + 1, typ, i + 3);
 
             bytes1 meta;
             if (isDynamic) {
@@ -1041,19 +1036,15 @@ library ABI {
         } else if (t == DYNAMIC_ARRAY_T) {
             return _typeEnd(typ, i + 1);
         } else if (t == FIXED_ARRAY_T) {
-            uint16 len = _readArrayTupleLength(typ, i + 1);
-            if (len > 0) {
-                return _typeEnd(typ, i + 3);
-            }
+            _readArrayTupleLength(typ, i + 1);
+            return _typeEnd(typ, i + 3);
         } else if (t == TUPLE_T) {
             uint16 len = _readArrayTupleLength(typ, i + 1);
-            if (len > 0) {
-                i += 3;
-                for (uint16 j = 0; j < len; ++j) {
-                    i = _typeEnd(typ, i);
-                }
-                return i;
+            i += 3;
+            for (uint16 j = 0; j < len; ++j) {
+                i = _typeEnd(typ, i);
             }
+            return i;
         }
 
         revert InvalidType();
@@ -1092,7 +1083,7 @@ library ABI {
         }
     }
 
-    function _read2(bytes memory b, uint256 i) private pure returns (bytes2 $) {
+    function _read2(bytes memory b, uint256 i) private pure returns (bytes2) {
         if (i + 1 >= b.length) {
             revert InvalidType();
         }
