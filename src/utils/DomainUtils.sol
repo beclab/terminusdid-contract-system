@@ -3,9 +3,11 @@ pragma solidity 0.8.21;
 
 library DomainUtils {
     using {asSlice} for string;
-    using DomainUtils for uint256;
+    using DomainUtils for Slice;
 
-    function asSlice(string memory self) internal pure returns (uint256 $) {
+    type Slice is uint256;
+
+    function asSlice(string memory self) internal pure returns (Slice $) {
         assembly {
             let l := mload(self)
             if shr(128, l) { revert(0, 0) }
@@ -19,18 +21,18 @@ library DomainUtils {
         return bytes(self).length == 0;
     }
 
-    function isEmpty(uint256 slice) internal pure returns (bool $) {
+    function isEmpty(Slice self) internal pure returns (bool $) {
         assembly {
-            $ := iszero(shl(128, slice))
+            $ := iszero(shl(128, self))
         }
     }
 
-    function toString(uint256 slice) internal pure returns (string memory $) {
+    function toString(Slice self) internal pure returns (string memory $) {
         assembly ("memory-safe") {
             $ := mload(0x40)
-            let l := and(slice, shr(128, not(0)))
+            let l := and(self, shr(128, not(0)))
             for {
-                let ps := shr(128, slice)
+                let ps := shr(128, self)
                 let e := add(ps, l)
                 let pd := add(32, $)
             } lt(ps, e) {
@@ -46,33 +48,33 @@ library DomainUtils {
         return uint256(keccak256(bytes(domain)));
     }
 
-    function tokenId(uint256 slice) internal pure returns (uint256 $) {
+    function tokenId(Slice self) internal pure returns (uint256 $) {
         assembly {
-            $ := keccak256(shr(128, slice), and(slice, shr(128, not(0))))
+            $ := keccak256(shr(128, self), and(self, shr(128, not(0))))
         }
     }
 
-    function parent(string memory domain) internal pure returns (uint256) {
+    function parent(string memory domain) internal pure returns (Slice) {
         return domain.asSlice().parent();
     }
 
-    function parent(uint256 slice) internal pure returns (uint256 $) {
-        (, $,) = slice.cut();
+    function parent(Slice self) internal pure returns (Slice $) {
+        (, $,) = self.cut();
     }
 
-    function cut(string memory domain) internal pure returns (uint256 label, uint256 parent_, bool hasParent) {
+    function cut(string memory domain) internal pure returns (Slice label, Slice parent_, bool hasParent) {
         return domain.asSlice().cut();
     }
 
-    function cut(uint256 slice) internal pure returns (uint256 label, uint256 parent_, bool hasParent) {
+    function cut(Slice self) internal pure returns (Slice label, Slice parent_, bool hasParent) {
         assembly {
-            label := slice
-            let p := shr(128, slice)
-            let e := add(p, and(slice, shr(128, not(0))))
+            label := self
+            let p := shr(128, self)
+            let e := add(p, and(self, shr(128, not(0))))
             for {} lt(p, e) { p := add(1, p) } {
                 if eq(shr(248, mload(p)), 0x2e) {
                     hasParent := true
-                    let b := shr(128, slice)
+                    let b := shr(128, self)
                     label := or(sub(p, b), shl(128, b))
                     p := add(1, p)
                     parent_ := or(sub(e, p), shl(128, p))
@@ -83,18 +85,18 @@ library DomainUtils {
         }
     }
 
-    function allLevels(string memory domain) internal pure returns (uint256[] memory) {
+    function allLevels(string memory domain) internal pure returns (Slice[] memory) {
         return domain.asSlice().allLevels();
     }
 
-    function allLevels(uint256 slice) internal pure returns (uint256[] memory $) {
+    function allLevels(Slice self) internal pure returns (Slice[] memory $) {
         assembly ("memory-safe") {
             $ := mload(0x40)
-            mstore(add(32, $), slice)
+            mstore(add(32, $), self)
             let m := add(64, $)
             for {
-                let p := shr(128, slice)
-                let e := sub(add(p, and(slice, shr(128, not(0)))), 1)
+                let p := shr(128, self)
+                let e := sub(add(p, and(self, shr(128, not(0)))), 1)
             } lt(p, e) { p := add(1, p) } {
                 if eq(shr(248, mload(p)), 0x2e) {
                     mstore(m, or(sub(e, p), shl(128, add(1, p))))
@@ -126,15 +128,15 @@ library DomainUtils {
         return bytes(label).length == validLength && validLength > 0;
     }
 
-    function isValidLabel(uint256 label) internal pure returns (bool) {
+    function isValidLabel(Slice self) internal pure returns (bool) {
         uint256 length;
         assembly {
-            length := and(label, shr(128, not(0)))
+            length := and(self, shr(128, not(0)))
         }
-        return length == validateLabel(label) && length > 0;
+        return length == validateLabel(self) && length > 0;
     }
 
-    function validateLabel(uint256 slice) private pure returns (uint256 validLength) {
+    function validateLabel(Slice self) private pure returns (uint256 validLength) {
         uint256 latinTable = 0x000000000000000000002001ffffffff800000000000000000004001ffffffff;
         uint256[89] memory table = [
             0x00de0002_00e00004_00e2c001_00e34001_00e88001_014c0001_0155c002_0162c002,
@@ -264,8 +266,8 @@ library DomainUtils {
                 }
             }
 
-            let p := shr(128, slice)
-            let l := and(slice, shr(128, not(0)))
+            let p := shr(128, self)
+            let l := and(self, shr(128, not(0)))
             let cl
             for { let e := add(p, l) } lt(p, e) { p := add(cl, p) } {
                 let cp
@@ -299,7 +301,7 @@ library DomainUtils {
                 }
                 if b { break }
             }
-            let vl := sub(p, shr(128, slice))
+            let vl := sub(p, shr(128, self))
             if gt(vl, l) { vl := sub(vl, cl) }
 
             validLength := vl

@@ -11,7 +11,7 @@ import {DomainUtils} from "../utils/DomainUtils.sol";
 
 contract Registrar is Context, Ownable2Step, IResolver {
     using DomainUtils for string;
-    using DomainUtils for uint256;
+    using DomainUtils for DomainUtils.Slice;
 
     TerminusDID private _registry;
 
@@ -119,7 +119,7 @@ contract Registrar is Context, Ownable2Step, IResolver {
         view
         returns (uint256 domainLevel, uint256 ownedLevel, string memory ownedDomain)
     {
-        for (uint256 ds = domain.asSlice(); !ds.isEmpty(); ds = ds.parent()) {
+        for (DomainUtils.Slice ds = domain.asSlice(); !ds.isEmpty(); ds = ds.parent()) {
             if (ownedLevel > 0) {
                 ++ownedLevel;
             } else if (_registry.ownerOf(ds.tokenId()) == owner) {
@@ -179,7 +179,7 @@ contract Registrar is Context, Ownable2Step, IResolver {
             return (address(this), getter);
         }
 
-        uint256[] memory levels = domain.allLevels();
+        DomainUtils.Slice[] memory levels = domain.allLevels();
 
         address resolver = _rootResolver;
         for (uint256 i = levels.length;;) {
@@ -199,7 +199,7 @@ contract Registrar is Context, Ownable2Step, IResolver {
     }
 
     function _allowRegister(address auth, string memory domain) internal view returns (bool) {
-        for (uint256 ds = domain.parent(); !ds.isEmpty(); ds = ds.parent()) {
+        for (DomainUtils.Slice ds = domain.parent(); !ds.isEmpty(); ds = ds.parent()) {
             if (_registry.ownerOf(ds.tokenId()) == auth) {
                 return true;
             }

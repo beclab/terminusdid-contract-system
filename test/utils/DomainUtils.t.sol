@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {DomainUtils} from "../../src/utils/DomainUtils.sol";
 
 contract DomainUtilsTest is Test {
-    using DomainUtils for uint256;
+    using DomainUtils for DomainUtils.Slice;
     using DomainUtils for string;
 
     string domain = "test.com";
@@ -16,44 +16,44 @@ contract DomainUtilsTest is Test {
     }
 
     function testTokenIdFromSlice() public {
-        uint256 slice = domain.asSlice();
+        DomainUtils.Slice slice = domain.asSlice();
         uint256 tokenId = uint256(keccak256(bytes(domain)));
         assertEq(tokenId, slice.tokenId());
     }
 
     function testIsEmpty() public {
-        uint256 slice = domain.asSlice();
+        DomainUtils.Slice slice = domain.asSlice();
         assertEq(slice.isEmpty(), false);
 
         string memory emptyStr;
-        uint256 slice2 = emptyStr.asSlice();
+        DomainUtils.Slice slice2 = emptyStr.asSlice();
         assertEq(slice2.isEmpty(), true);
     }
 
     function testToString() public {
-        uint256 slice = domain.asSlice();
+        DomainUtils.Slice slice = domain.asSlice();
         assertEq(domain, slice.toString());
 
         string memory domain2 = unicode"汤唯.中国";
-        uint256 slice2 = domain2.asSlice();
+        DomainUtils.Slice slice2 = domain2.asSlice();
         assertEq(domain2, slice2.toString());
     }
 
     function testParent() public {
         string memory subDomain = "a.test.com";
-        uint256 parentSlice = subDomain.parent();
-        uint256 slice = domain.asSlice();
+        DomainUtils.Slice parentSlice = subDomain.parent();
+        DomainUtils.Slice slice = domain.asSlice();
 
         assertEq(slice.toString(), parentSlice.toString());
 
         string memory topDomain = "com";
-        uint256 topDomainParent = topDomain.parent();
+        DomainUtils.Slice topDomainParent = topDomain.parent();
         assertEq(topDomainParent.toString(), "");
     }
 
     function testSplit() public {
-        uint256 label;
-        uint256 parentDomain;
+        DomainUtils.Slice label;
+        DomainUtils.Slice parentDomain;
         bool hasParent;
         (label, parentDomain, hasParent) = domain.cut();
         assertEq(true, hasParent);
@@ -101,7 +101,7 @@ contract DomainUtilsTest is Test {
     function testTraceAllLevel() public {
         string memory subDomain;
         subDomain = "a.b.c.d.e.test.com";
-        uint256[] memory allLevels;
+        DomainUtils.Slice[] memory allLevels;
         allLevels = subDomain.allLevels();
         assertEq(allLevels.length, 7);
         assertEq(allLevels[0].toString(), "a.b.c.d.e.test.com");

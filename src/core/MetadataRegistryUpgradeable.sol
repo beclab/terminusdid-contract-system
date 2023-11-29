@@ -14,7 +14,7 @@ struct Metadata {
 
 abstract contract MetadataRegistryUpgradeable is Initializable {
     using DomainUtils for string;
-    using DomainUtils for uint256;
+    using DomainUtils for DomainUtils.Slice;
 
     /// @custom:storage-location erc7201:terminus.MetadataRegistry
     struct __MetadataRegistry_Storage {
@@ -50,7 +50,7 @@ abstract contract MetadataRegistryUpgradeable is Initializable {
     }
 
     function __MetadataRegistry_register(Metadata memory metadata) internal returns (uint256 id) {
-        (uint256 label, uint256 parent, bool hasParent) = metadata.domain.cut();
+        (DomainUtils.Slice label, DomainUtils.Slice parent, bool hasParent) = metadata.domain.cut();
 
         if (hasParent) {
             Metadata memory parentData = __MetadataRegistry_get(parent.tokenId());
