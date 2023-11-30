@@ -422,8 +422,11 @@ library ABI {
                 }
                 assembly {
                     mstore(pTail, len)
-                    mstore(add(32, pTail), data)
-                    pTail := add(64, pTail)
+                    pTail := add(32, pTail)
+                    if len {
+                        mstore(pTail, data)
+                        pTail := add(32, pTail)
+                    }
                 }
             } else {
                 slot = _hashSlot(slot);
@@ -483,12 +486,15 @@ library ABI {
                     pHead = pHead_;
                     pTail = pTail_;
                 }
+                if (pHead > pTail) {
+                    pTail = pHead;
+                }
             } else {
                 pMeta = _typeMetaEnd(pMeta, typ, ++i);
                 i = _typeEnd(typ, i);
             }
 
-            return (nextSlot, 0, i + 1, pMeta, nextPHead, pTail);
+            return (nextSlot, 0, i, pMeta, nextPHead, pTail);
         } else if (t == FIXED_ARRAY_T) {
             (slot, offset) = _align(slot, offset);
 
@@ -501,11 +507,6 @@ library ABI {
                     (slot, offset, i, pMeta, pHead,) = _load(slot, offset, typ, i0, pMeta0, pHead, type(uint256).max);
                 }
             } else {
-                assembly {
-                    mstore(pTail, len)
-                    pTail := add(32, pTail)
-                }
-
                 uint256 nextPHead = pHead + 32;
                 uint256 pos = 32 * len;
                 pHead = pTail;
@@ -754,12 +755,15 @@ library ABI {
                 for (uint256 j = 0; j < len; ++j) {
                     (slot, offset, i, pMeta, pHead, pTail) = _store(slot, offset, typ, i0, pMeta0, pStart, pHead, pTail);
                 }
+                if (pHead > pTail) {
+                    pTail = pHead;
+                }
             } else {
                 pMeta = _typeMetaEnd(pMeta, typ, ++i);
                 i = _typeEnd(typ, i);
             }
 
-            return (nextSlot, 0, i + 1, pMeta, nextPHead, pTail);
+            return (nextSlot, 0, i, pMeta, nextPHead, pTail);
         } else if (t == FIXED_ARRAY_T) {
             (slot, offset) = _align(slot, offset);
 
