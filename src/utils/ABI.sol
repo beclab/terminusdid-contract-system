@@ -490,8 +490,7 @@ library ABI {
                     pTail = pHead;
                 }
             } else {
-                pMeta = _typeMetaEnd(pMeta, typ, ++i);
-                i = _typeEnd(typ, i);
+                (pMeta, i) = _typeMetaEnd(pMeta, typ, ++i);
             }
 
             return (nextSlot, 0, i, pMeta, nextPHead, pTail);
@@ -759,8 +758,7 @@ library ABI {
                     pTail = pHead;
                 }
             } else {
-                pMeta = _typeMetaEnd(pMeta, typ, ++i);
-                i = _typeEnd(typ, i);
+                (pMeta, i) = _typeMetaEnd(pMeta, typ, ++i);
             }
 
             return (nextSlot, 0, i, pMeta, nextPHead, pTail);
@@ -957,7 +955,7 @@ library ABI {
         bytes1 t = _read1(typ, i);
 
         if (t == STRING_T || t == BYTES_T) {
-            (isDynamic, size) = (true, 1);
+            (i, isDynamic, size) = (i + 1, true, 1);
         } else if (t == DYNAMIC_ARRAY_T) {
             (p, i, isDynamic,) = _typeMeta(p, typ, i + 1);
             (isDynamic, size) = (true, 1);
@@ -966,15 +964,15 @@ library ABI {
             uint256 pArray = p;
             (p, i, isDynamic, size) = _typeMeta(p + 1, typ, i + 3);
 
-            bytes1 meta;
+            uint256 meta;
             if (isDynamic) {
-                meta = bytes1(hex"ff");
+                meta = 0xff;
                 size = 1;
             } else {
                 size *= len;
             }
             assembly {
-                mstore(pArray, meta)
+                mstore8(pArray, meta)
             }
         } else if (t == TUPLE_T) {
             uint16 len = _readArrayTupleLength(typ, i + 1);
@@ -997,13 +995,14 @@ library ABI {
             }
             size = uint16(total);
 
-            bytes2 meta;
+            uint256 meta;
             if (isDynamic) {
-                meta = bytes2(uint16(size));
+                meta = size;
                 size = 1;
             }
             assembly {
-                mstore(pTuple, meta)
+                mstore8(pTuple, shr(8, meta))
+                mstore8(add(1, pTuple), meta)
             }
         } else {
             i = _typeEnd(typ, i);
@@ -1013,7 +1012,11 @@ library ABI {
         return (p, i, isDynamic, size);
     }
 
-    function _typeMetaEnd(uint256 pMeta, bytes memory typ, uint256 i) private pure returns (uint256) {
+    function _typeMetaEnd(uint256 pMeta, bytes memory typ, uint256 i)
+        private
+        pure
+        returns (uint256 pMeta_, uint256 i_)
+    {
         bytes1 t = _read1(typ, i);
 
         if (t == DYNAMIC_ARRAY_T) {
@@ -1022,11 +1025,17 @@ library ABI {
             _readArrayTupleLength(typ, i + 1);
             return _typeMetaEnd(pMeta + 1, typ, i + 3);
         } else if (t == TUPLE_T) {
-            _readArrayTupleLength(typ, i + 1);
-            return _typeMetaEnd(pMeta + 2, typ, i + 3);
+            uint16 len = _readArrayTupleLength(typ, i + 1);
+            i += 3;
+            pMeta += 2;
+            for (uint16 j = 0; j < len; ++j) {
+                (pMeta, i) = _typeMetaEnd(pMeta, typ, i);
+            }
+        } else {
+            i = _typeEnd(typ, i);
         }
 
-        return pMeta;
+        return (pMeta, i);
     }
 
     function _typeEnd(bytes memory typ, uint256 i) private pure returns (uint256) {
