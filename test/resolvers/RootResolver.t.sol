@@ -12,7 +12,7 @@ import {Registrar} from "../../src/core/Registrar.sol";
 import {Metadata} from "../../src/core/MetadataRegistryUpgradeable.sol";
 import {DomainUtils} from "../../src/utils/DomainUtils.sol";
 
-contract TerminusDIDTest is Test {
+contract RootResolverTest is Test {
     using DomainUtils for string;
 
     RootResolver public rootResolver;
