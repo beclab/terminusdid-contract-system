@@ -3,16 +3,23 @@ pragma solidity 0.8.21;
 
 import {IERC165} from "@openzeppelin/contracts/interfaces/IERC165.sol";
 import {IERC5313} from "@openzeppelin/contracts/interfaces/IERC5313.sol";
-import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {MulticallUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/MulticallUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import {ERC721Upgradeable} from "./ERC721Upgradeable.sol";
 import {TagRegistry} from "./TagRegistry.sol";
 import {DomainUtils} from "../utils/DomainUtils.sol";
 
-contract TerminusDID is IERC165, ERC721Upgradeable, Ownable2StepUpgradeable, UUPSUpgradeable, TagRegistry, Multicall {
+contract TerminusDID is
+    IERC165,
+    ERC721Upgradeable,
+    Ownable2StepUpgradeable,
+    UUPSUpgradeable,
+    TagRegistry,
+    MulticallUpgradeable
+{
     using DomainUtils for string;
     using DomainUtils for DomainUtils.Slice;
 
@@ -26,6 +33,7 @@ contract TerminusDID is IERC165, ERC721Upgradeable, Ownable2StepUpgradeable, UUP
     /// @custom:storage-location erc7201:terminus.TerminusDID
     struct __TerminusDID_Storage {
         mapping(uint256 tokenId => Metadata) metadata;
+        mapping(string domain => mapping(string name => address)) taggers;
         address operator;
     }
 
@@ -168,6 +176,11 @@ contract TerminusDID is IERC165, ERC721Upgradeable, Ownable2StepUpgradeable, UUP
         __ERC721_mint(tokenOwner, tokenId);
     }
 
+    function setTagger(string calldata domain, string calldata name, address tagger) public {
+        _authorizeDefineTag(domain);
+        _getStorage().taggers[domain][name] = tagger;
+    }
+
     function _authorizeDefineTag(string calldata domain) internal view override {
         address caller = _msgSender();
         if (domain.isEmpty() && caller == operator()) {
@@ -179,15 +192,10 @@ contract TerminusDID is IERC165, ERC721Upgradeable, Ownable2StepUpgradeable, UUP
         revert Unauthorized();
     }
 
-    function _authorizeSetTag(string calldata from, string calldata to) internal view override {
-        address caller = _msgSender();
-        if (from.isEmpty() && caller == operator()) {
-            return;
+    function _authorizeSetTag(string calldata from, string calldata to, string calldata name) internal view override {
+        if (!(_allowSetTag(from, to) && _msgSender() == _getStorage().taggers[from][name])) {
+            revert Unauthorized();
         }
-        if (caller == ownerOf(from.tokenId()) && _allowSetTag(from, to)) {
-            return;
-        }
-        revert Unauthorized();
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {}
@@ -202,6 +210,9 @@ contract TerminusDID is IERC165, ERC721Upgradeable, Ownable2StepUpgradeable, UUP
     }
 
     function _allowSetTag(string calldata from, string calldata to) private pure returns (bool) {
+        if (from.isEmpty()) {
+            return true;
+        }
         for (DomainUtils.Slice ds = to.asSlice(); !ds.isEmpty(); ds = ds.parent()) {
             if (Strings.equal(ds.toString(), from)) {
                 return true;

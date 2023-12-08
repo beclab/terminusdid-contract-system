@@ -33,8 +33,10 @@ abstract contract TagRegistry {
 
     error RedefinedTag(string domain, string name);
 
+    error InvalidTagDefinition();
+
     function addTag(string calldata from, string calldata to, string calldata name, bytes calldata value) public {
-        _authorizeSetTag(from, to);
+        _authorizeSetTag(from, to, name);
         __TagRegistry_Storage storage $ = __TagRegistry_getStorage();
         bytes memory abiType = $.types[from][name].abiType;
         if (abiType.length == 0) {
@@ -44,7 +46,7 @@ abstract contract TagRegistry {
     }
 
     function removeTag(string calldata from, string calldata to, string calldata name) public {
-        _authorizeSetTag(from, to);
+        _authorizeSetTag(from, to, name);
         __TagRegistry_Storage storage $ = __TagRegistry_getStorage();
         $.tags[from][to].remove(name);
     }
@@ -64,8 +66,8 @@ abstract contract TagRegistry {
         uint256[] calldata elemPath,
         bytes calldata value
     ) public {
+        _authorizeSetTag(from, to, name);
         __TagRegistry_getReflectVar(from, to, name, elemPath).set(value);
-        _authorizeSetTag(from, to);
     }
 
     function getTagElemLength(
@@ -84,15 +86,15 @@ abstract contract TagRegistry {
         uint256[] calldata elemPath,
         bytes calldata value
     ) public {
+        _authorizeSetTag(from, to, name);
         __TagRegistry_getReflectVar(from, to, name, elemPath).push(value);
-        _authorizeSetTag(from, to);
     }
 
     function popTagElem(string calldata from, string calldata to, string calldata name, uint256[] calldata elemPath)
         public
     {
+        _authorizeSetTag(from, to, name);
         __TagRegistry_getReflectVar(from, to, name, elemPath).pop();
-        _authorizeSetTag(from, to);
     }
 
     function getTagCount(string calldata from, string calldata to) public view returns (uint256) {
@@ -131,8 +133,18 @@ abstract contract TagRegistry {
         if (tagType.abiType.length > 0) {
             revert RedefinedTag(domain, name);
         }
+        if (!__TagRegistry_isValidName(name)) {
+            revert InvalidTagDefinition();
+        }
         ABI.validateType(abiType);
-        // TODO: validate field names
+        if (ABI.totalTupleFields(abiType) != fieldNames.length) {
+            revert InvalidTagDefinition();
+        }
+        for (uint256 i = 0; i < fieldNames.length; ++i) {
+            if (!__TagRegistry_isValidName(fieldNames[i])) {
+                revert InvalidTagDefinition();
+            }
+        }
         (bytes32 fieldNamesHash,) = $.fieldNames.add(fieldNames);
         tagType.abiType = abiType;
         tagType.fieldNamesHash = fieldNamesHash;
@@ -140,7 +152,30 @@ abstract contract TagRegistry {
 
     function _authorizeDefineTag(string calldata domain) internal virtual;
 
-    function _authorizeSetTag(string calldata from, string calldata to) internal virtual;
+    function _authorizeSetTag(string calldata from, string calldata to, string calldata name) internal virtual;
+
+    function __TagRegistry_isValidName(string memory fieldName) private pure returns (bool) {
+        uint256 len = bytes(fieldName).length;
+        if (len == 0 || len > 31) {
+            return false;
+        }
+        bytes32 s;
+        assembly {
+            s := mload(add(32, fieldName))
+        }
+        uint8 c0 = uint8(s[0]);
+        if (c0 < 0x61 || c0 > 0x7a) {
+            return false;
+        }
+        for (uint256 i = 1; i < len; ++i) {
+            uint8 c = uint8(s[i]);
+            if ((c >= 0x61 && c <= 0x7a) || (c >= 0x41 && c <= 0x5a) || (c >= 0x30 && c <= 0x39)) {
+                continue;
+            }
+            return false;
+        }
+        return true;
+    }
 
     function __TagRegistry_getReflectVar(
         string calldata from,

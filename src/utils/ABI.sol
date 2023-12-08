@@ -118,6 +118,11 @@ library ABI {
         }
     }
 
+    function totalTupleFields(bytes memory typ) internal pure returns (uint256) {
+        (uint256 count,) = _tupleFieldsCount(typ, 0);
+        return count;
+    }
+
     function bind(Var storage self, bytes memory typ) internal pure returns (ReflectVar memory) {
         bytes32 slot;
         assembly {
@@ -1036,6 +1041,30 @@ library ABI {
         }
 
         return (pMeta, i);
+    }
+
+    function _tupleFieldsCount(bytes memory typ, uint256 i) private pure returns (uint256 count, uint256 i_) {
+        bytes1 t = _read1(typ, i);
+
+        if (t == DYNAMIC_ARRAY_T) {
+            return _tupleFieldsCount(typ, i + 1);
+        } else if (t == FIXED_ARRAY_T) {
+            _readArrayTupleLength(typ, i + 1);
+            return _tupleFieldsCount(typ, i + 3);
+        } else if (t == TUPLE_T) {
+            uint16 len = _readArrayTupleLength(typ, i + 1);
+            i += 3;
+            for (uint16 j = 0; j < len; ++j) {
+                uint256 n;
+                (n, i) = _tupleFieldsCount(typ, i);
+                count += n;
+            }
+            count += len;
+        } else {
+            i = _typeEnd(typ, i);
+        }
+
+        return (count, i);
     }
 
     function _typeEnd(bytes memory typ, uint256 i) private pure returns (uint256) {
