@@ -223,7 +223,7 @@ contract ABITest is Test {
         }
         assertEq(got[length], value);
 
-        uint256[] memory arrayValue = new uint[](2);
+        uint256[] memory arrayValue = new uint256[](2);
         arrayValue[0] = type(uint256).max;
         arrayValue[1] = type(uint256).min;
 

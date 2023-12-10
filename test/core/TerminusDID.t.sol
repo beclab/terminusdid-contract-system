@@ -21,12 +21,9 @@ contract TerminusDIDTest is Test {
     address _deployer = address(this);
     address _operator = address(0xabcd);
 
-    // string _domain = "com";
-    // string _did = "did:key:z6MkgUJW1QVWDKfmPpduShonrqMUXYvhw7brj8tbsSrzHquU#Hfu7JoVmWeQz3cfJrF2zhG7XP5z-smWOLFeP_OOghpM";
-
-    // event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
-    // event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
-    // event ReceivedERC721Token(address indexed operator, address indexed from, uint256 indexed tokenId, bytes data);
+    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
+    event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
+    event ReceivedERC721Token(address indexed operator, address indexed from, uint256 indexed tokenId, bytes data);
 
     function setUp() public {
         terminusDID = new TerminusDID();
@@ -38,158 +35,207 @@ contract TerminusDIDTest is Test {
     }
 
     function testBasis() public {
-        assertEq(_name, terminusDIDProxy.name());
-        assertEq(_symbol, terminusDIDProxy.symbol());
-        assertEq(_deployer, terminusDIDProxy.owner());
-        assertEq(_operator, terminusDIDProxy.operator());
+        assertEq(terminusDIDProxy.name(), _name);
+        assertEq(terminusDIDProxy.symbol(), _symbol);
+        assertEq(terminusDIDProxy.owner(), _deployer);
+        assertEq(terminusDIDProxy.operator(), _operator);
     }
 
-    // /*//////////////////////////////////////////////////////////////
-    //                          Ownership test
-    // //////////////////////////////////////////////////////////////*/
-    // function testOwnership() public {
-    //     assertEq(terminusDIDProxy.owner(), _deployer);
+    function testSetOperator() public {
+        // only owner can set operator
+        address notOwner = address(100);
+        vm.prank(notOwner);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
+        terminusDIDProxy.setOperator(_operator);
 
-    //     address newOwner = address(100);
-    //     // only cur owner can transfer ownership
-    //     vm.prank(newOwner);
-    //     vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, newOwner));
-    //     terminusDIDProxy.transferOwnership(newOwner);
-    //     vm.prank(_deployer);
-    //     terminusDIDProxy.transferOwnership(newOwner);
+        address newOperator = address(200);
+        terminusDIDProxy.setOperator(newOperator);
+        assertEq(terminusDIDProxy.operator(), newOperator);
+    }
 
-    //     assertEq(terminusDIDProxy.pendingOwner(), newOwner);
+    /*//////////////////////////////////////////////////////////////
+                             Ownership test
+    //////////////////////////////////////////////////////////////*/
+    function testOwnership() public {
+        assertEq(terminusDIDProxy.owner(), _deployer);
 
-    //     // only new owner can accept the ownership transfer
-    //     vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, _deployer));
-    //     terminusDIDProxy.acceptOwnership();
-    //     vm.prank(newOwner);
-    //     terminusDIDProxy.acceptOwnership();
+        address newOwner = address(100);
+        // only current owner can transfer ownership
+        vm.prank(newOwner);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, newOwner));
+        terminusDIDProxy.transferOwnership(newOwner);
+        vm.prank(_deployer);
+        terminusDIDProxy.transferOwnership(newOwner);
 
-    //     assertEq(terminusDIDProxy.owner(), newOwner);
-    // }
+        // in pending status
+        assertEq(terminusDIDProxy.pendingOwner(), newOwner);
+        assertEq(terminusDIDProxy.owner(), _deployer);
 
-    // /*//////////////////////////////////////////////////////////////
-    //                          Upgrade test
-    // //////////////////////////////////////////////////////////////*/
-    // function testUpgradeImpl() public {
-    //     MockTerminusDID newImpl = new MockTerminusDID();
+        // only new owner can accept the ownership transfer
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, _deployer));
+        terminusDIDProxy.acceptOwnership();
+        vm.prank(newOwner);
+        terminusDIDProxy.acceptOwnership();
 
-    //     // only owner can upgrade
-    //     address notOwner = address(200);
-    //     vm.prank(notOwner);
-    //     vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
-    //     terminusDIDProxy.upgradeToAndCall(address(newImpl), "");
+        assertEq(terminusDIDProxy.owner(), newOwner);
+    }
 
-    //     // upgrade by owner
-    //     vm.prank(_deployer);
-    //     terminusDIDProxy.upgradeToAndCall(address(newImpl), "");
+    /*//////////////////////////////////////////////////////////////
+                             Upgrade test
+    //////////////////////////////////////////////////////////////*/
+    function testUpgradeImpl() public {
+        MockTerminusDID newImpl = new MockTerminusDID();
 
-    //     MockTerminusDID proxy = MockTerminusDID(address(terminusDIDProxy));
-    //     assertEq(proxy.getVersion(), "mock version");
-    // }
+        // only owner can upgrade
+        address notOwner = address(200);
+        vm.prank(notOwner);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, notOwner));
+        terminusDIDProxy.upgradeToAndCall(address(newImpl), "");
 
-    // /*//////////////////////////////////////////////////////////////
-    //                          Register test
-    // //////////////////////////////////////////////////////////////*/
+        // upgrade by owner
+        vm.prank(_deployer);
+        terminusDIDProxy.upgradeToAndCall(address(newImpl), "");
 
-    // function testFuzzRegister(bool allowSubdomain) public {
-    //     address owner = address(100);
-    //     uint256 tokenIdCalc = uint256(keccak256(bytes(_domain)));
-    //     Metadata memory metadata = Metadata(_domain, _did, "", allowSubdomain);
+        MockTerminusDID proxy = MockTerminusDID(address(terminusDIDProxy));
+        assertEq(proxy.getVersion(), "mock version");
+    }
 
-    //     vm.expectEmit(true, true, true, false);
-    //     emit Transfer(address(0), owner, tokenIdCalc);
-    //     uint256 tokenId = terminusDIDProxy.register(owner, metadata);
+    /*//////////////////////////////////////////////////////////////
+                             Register test
+    //////////////////////////////////////////////////////////////*/
 
-    //     assertEq(tokenId, tokenIdCalc);
+    function testRegister() public {
+        string memory domain = "a";
+        string memory did = "did";
+        bool allowSubdomain = true;
 
-    //     Metadata memory metadataRet = terminusDIDProxy.getMetadata(tokenId);
+        // register by operator
+        address domainOwner = address(100);
+        uint256 tokenIdCalc = uint256(keccak256(bytes(domain)));
 
-    //     assertEq(_domain, metadataRet.domain);
-    //     assertEq(_did, metadataRet.did);
-    //     assertEq("", metadataRet.notes);
-    //     assertEq(allowSubdomain, metadataRet.allowSubdomain);
-    // }
+        vm.expectEmit(true, true, true, false);
+        emit Transfer(address(0), domainOwner, tokenIdCalc);
+        vm.prank(_operator);
+        uint256 tokenId = terminusDIDProxy.register(domainOwner, TerminusDID.Metadata(domain, did, "", allowSubdomain));
 
-    // function testFuzzRegisterNotByRegistrar(bool allowSubdomain) public {
-    //     address notRegistrar = address(1);
-    //     address owner = address(100);
-    //     Metadata memory metadata = Metadata(_domain, _did, "", allowSubdomain);
+        assertEq(tokenId, tokenIdCalc);
 
-    //     vm.prank(notRegistrar);
-    //     vm.expectRevert(abi.encodeWithSelector(TerminusDID.UnauthorizedRegistrar.selector, notRegistrar));
-    //     terminusDIDProxy.register(owner, metadata);
-    // }
+        TerminusDID.Metadata memory metadataRet = terminusDIDProxy.getMetadata(tokenId);
 
-    // function testFuzzRegisterDuplicateDomain(bool allowSubdomain) public {
-    //     address owner = address(100);
-    //     Metadata memory metadata = Metadata(_domain, _did, "", allowSubdomain);
+        assertEq(metadataRet.domain, domain);
+        assertEq(metadataRet.did, did);
+        assertEq(metadataRet.notes, "");
+        assertEq(metadataRet.allowSubdomain, allowSubdomain);
 
-    //     terminusDIDProxy.register(owner, metadata);
+        // register by parent domain owner
+        string memory subdomain = "b.a";
+        address subdomainOwner = address(200);
+        uint256 tokenIdCalc1 = uint256(keccak256(bytes(subdomain)));
+        vm.prank(domainOwner);
+        uint256 tokenId1 =
+            terminusDIDProxy.register(subdomainOwner, TerminusDID.Metadata(subdomain, did, "", allowSubdomain));
 
-    //     vm.expectRevert(MetadataRegistryUpgradeable.ExistentDomain.selector);
-    //     terminusDIDProxy.register(owner, metadata);
-    // }
+        assertEq(tokenId1, tokenIdCalc1);
+        TerminusDID.Metadata memory metadataRet1 = terminusDIDProxy.getMetadata(tokenId1);
+        assertEq(metadataRet1.domain, subdomain);
+        assertEq(metadataRet1.did, did);
+        assertEq(metadataRet1.notes, "");
+        assertEq(metadataRet1.allowSubdomain, allowSubdomain);
+    }
 
-    // function testFuzzRegisterToZeroAddressOwner(bool allowSubdomain) public {
-    //     address owner = address(0);
-    //     Metadata memory metadata = Metadata(_domain, _did, "", allowSubdomain);
+    function testFuzzRegisterNotByOperator(bool allowSubdomain) public {
+        string memory domain = "a";
+        string memory did = "did";
+        address notOperator = address(1);
+        address owner = address(100);
 
-    //     vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721InvalidReceiver.selector, owner));
-    //     terminusDIDProxy.register(owner, metadata);
-    // }
+        vm.prank(notOperator);
+        vm.expectRevert(abi.encodeWithSelector(TerminusDID.Unauthorized.selector));
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, did, "", allowSubdomain));
+    }
 
-    // function testFuzzRegisterWithoutParentDomain(bool allowSubdomain) public {
-    //     address owner = address(100);
-    //     string memory domain = "abc.xyz";
-    //     Metadata memory metadata = Metadata(domain, _did, "", allowSubdomain);
+    function testFuzzRegisterDuplicateDomain(bool allowSubdomain) public {
+        string memory domain = "a";
+        string memory did = "did";
+        address owner = address(100);
+        TerminusDID.Metadata memory metadata = TerminusDID.Metadata(domain, did, "", allowSubdomain);
 
-    //     vm.expectRevert(MetadataRegistryUpgradeable.UnregisteredParentDomain.selector);
-    //     terminusDIDProxy.register(owner, metadata);
-    // }
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, metadata);
 
-    // function testRegisterToParentNotAllowSubdomain() public {
-    //     // register parent domain "com" with not allow subdomain
-    //     address owner = address(100);
-    //     bool allowSubdomain = false;
-    //     Metadata memory metadata = Metadata(_domain, _did, "", allowSubdomain);
-    //     terminusDIDProxy.register(owner, metadata);
+        vm.expectRevert(TerminusDID.ExistentDomain.selector);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, metadata);
+    }
 
-    //     // register subdomain fails
-    //     string memory subDomain = "abc.com";
-    //     Metadata memory newMetadata = Metadata(subDomain, _did, "", allowSubdomain);
+    function testFuzzRegisterToZeroAddressOwner(bool allowSubdomain) public {
+        string memory domain = "a";
+        string memory did = "did";
+        address owner = address(0);
 
-    //     vm.expectRevert(MetadataRegistryUpgradeable.DisallowedSubdomain.selector);
-    //     terminusDIDProxy.register(owner, newMetadata);
-    // }
+        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721InvalidReceiver.selector, owner));
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, did, "", allowSubdomain));
+    }
 
-    // function testFuzzRegisterSpecialDomainLabel(bool allowSubdomain) public {
-    //     address owner = address(100);
-    //     string memory domain = "com.";
-    //     Metadata memory metadata = Metadata(domain, _did, "", allowSubdomain);
+    function testFuzzRegisterWithoutParentDomain(bool allowSubdomain) public {
+        string memory domain = "abc.xyz";
+        string memory did = "did";
+        address owner = address(100);
 
-    //     vm.expectRevert(MetadataRegistryUpgradeable.UnregisteredParentDomain.selector);
-    //     terminusDIDProxy.register(owner, metadata);
-    // }
+        vm.expectRevert(TerminusDID.UnregisteredParentDomain.selector);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, did, "", allowSubdomain));
+    }
 
-    // function testFuzzRegisterInvalidDomainLabel(bool allowSubdomain) public {
-    //     address owner = address(100);
-    //     string memory domain = "\u0600";
-    //     Metadata memory metadata = Metadata(domain, _did, "", allowSubdomain);
+    function testRegisterToParentNotAllowSubdomain() public {
+        string memory domain = "com";
+        string memory did = "did";
 
-    //     vm.expectRevert(MetadataRegistryUpgradeable.InvalidDomainLabel.selector);
-    //     terminusDIDProxy.register(owner, metadata);
-    // }
+        // register parent domain "com" with not allow subdomain
+        address owner = address(100);
+        bool allowSubdomain = false;
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, did, "", allowSubdomain));
 
-    // function testFuzzRegisterEmptyDomain(bool allowSubdomain) public {
-    //     address owner = address(100);
-    //     string memory domain = "";
-    //     Metadata memory metadata = Metadata(domain, _did, "", allowSubdomain);
+        // register subdomain fails
+        string memory subDomain = "abc.com";
 
-    //     vm.expectRevert(MetadataRegistryUpgradeable.InvalidDomainLabel.selector);
-    //     terminusDIDProxy.register(owner, metadata);
-    // }
+        vm.expectRevert(TerminusDID.DisallowedSubdomain.selector);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(subDomain, did, "", allowSubdomain));
+    }
+
+    function testFuzzRegisterSpecialDomainLabel(bool allowSubdomain) public {
+        address owner = address(100);
+        string memory domain = "com.";
+        string memory did = "did";
+
+        vm.expectRevert(TerminusDID.UnregisteredParentDomain.selector);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, did, "", allowSubdomain));
+    }
+
+    function testFuzzRegisterInvalidDomainLabel(bool allowSubdomain) public {
+        string memory domain = "\u0600";
+        string memory did = "did";
+        
+        address owner = address(100);
+
+        vm.expectRevert(TerminusDID.InvalidDomainLabel.selector);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, did, "", allowSubdomain));
+    }
+
+    function testFuzzRegisterEmptyDomain(bool allowSubdomain) public {
+        address owner = address(100);
+        string memory domain = "";
+        string memory did = "did";
+
+        vm.expectRevert(TerminusDID.InvalidDomainLabel.selector);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, did, "", allowSubdomain));
+    }
 
     // /*//////////////////////////////////////////////////////////////
     //                          Set tag test
@@ -350,48 +396,53 @@ contract TerminusDIDTest is Test {
     //     assertEq(value, "");
     // }
 
-    // /*//////////////////////////////////////////////////////////////
-    //                          ERC721 test
-    // //////////////////////////////////////////////////////////////*/
-    // function testIsErc721() public {
-    //     bytes4 erc721InterfaceId = bytes4(0x80ac58cd);
-    //     assertEq(terminusDIDProxy.supportsInterface(erc721InterfaceId), true);
-    // }
+    /*//////////////////////////////////////////////////////////////
+                             ERC721 test
+    //////////////////////////////////////////////////////////////*/
+    function testIsErc721() public {
+        bytes4 erc721InterfaceId = bytes4(0x80ac58cd);
+        assertEq(terminusDIDProxy.supportsInterface(erc721InterfaceId), true);
+    }
 
-    // function testFuzzErc721Basis() public {
-    //     address owner = address(100);
-    //     address zeroAddr = address(0);
+    function testFuzzErc721Basis() public {
+        string memory domain = "com";
+        string memory did = "did";
 
-    //     bool allowSubdomain = true;
-    //     Metadata memory metadata = Metadata(_domain, _did, "", allowSubdomain);
-    //     uint256 tokenId1 = terminusDIDProxy.register(owner, metadata);
+        address owner = address(100);
+        address zeroAddr = address(0);
 
-    //     Metadata memory metadata2 = Metadata("test2.com", _did, "", allowSubdomain);
-    //     uint256 tokenId2 = terminusDIDProxy.register(owner, metadata2);
+        bool allowSubdomain = true;
+        TerminusDID.Metadata memory metadata = TerminusDID.Metadata(domain, did, "", allowSubdomain);
+        vm.prank(_operator);
+        uint256 tokenId1 = terminusDIDProxy.register(owner, metadata);
 
-    //     assertEq(terminusDIDProxy.balanceOf(owner), 2);
+        TerminusDID.Metadata memory metadata2 = TerminusDID.Metadata("test.com", did, "", allowSubdomain);
+        vm.prank(_operator);
+        uint256 tokenId2 = terminusDIDProxy.register(owner, metadata2);
 
-    //     vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721InvalidOwner.selector, zeroAddr));
-    //     terminusDIDProxy.balanceOf(zeroAddr);
+        assertEq(terminusDIDProxy.balanceOf(owner), 2);
 
-    //     assertEq(terminusDIDProxy.ownerOf(tokenId1), owner);
-    //     assertEq(terminusDIDProxy.ownerOf(tokenId2), owner);
+        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721InvalidOwner.selector, zeroAddr));
+        terminusDIDProxy.balanceOf(zeroAddr);
 
-    //     assertEq(terminusDIDProxy.tokenURI(tokenId1), _did);
-    //     assertEq(terminusDIDProxy.tokenURI(tokenId2), _did);
+        assertEq(terminusDIDProxy.ownerOf(tokenId1), owner);
+        assertEq(terminusDIDProxy.ownerOf(tokenId2), owner);
 
-    //     assertEq(terminusDIDProxy.totalSupply(), 2);
+        assertEq(terminusDIDProxy.tokenURI(tokenId1), did);
+        assertEq(terminusDIDProxy.tokenURI(tokenId2), did);
 
-    //     assertEq(terminusDIDProxy.tokenByIndex(0), tokenId1);
-    //     assertEq(terminusDIDProxy.tokenByIndex(1), tokenId2);
-    //     vm.expectRevert(abi.encodeWithSelector(ERC721Enumerable.ERC721OutOfBoundsIndex.selector, zeroAddr, 2));
-    //     terminusDIDProxy.tokenByIndex(2);
+        assertEq(terminusDIDProxy.totalSupply(), 2);
 
-    //     assertEq(terminusDIDProxy.tokenOfOwnerByIndex(owner, 0), tokenId1);
-    //     assertEq(terminusDIDProxy.tokenOfOwnerByIndex(owner, 1), tokenId2);
-    //     vm.expectRevert(abi.encodeWithSelector(ERC721Enumerable.ERC721OutOfBoundsIndex.selector, owner, 2));
-    //     terminusDIDProxy.tokenOfOwnerByIndex(owner, 2);
-    // }
+        assertEq(terminusDIDProxy.tokenByIndex(0), tokenId1);
+        assertEq(terminusDIDProxy.tokenByIndex(1), tokenId2);
+        vm.expectRevert(abi.encodeWithSelector(ERC721Enumerable.ERC721OutOfBoundsIndex.selector, zeroAddr, 2));
+        terminusDIDProxy.tokenByIndex(2);
+
+        assertEq(terminusDIDProxy.tokenOfOwnerByIndex(owner, 0), tokenId1);
+        assertEq(terminusDIDProxy.tokenOfOwnerByIndex(owner, 1), tokenId2);
+        vm.expectRevert(abi.encodeWithSelector(ERC721Enumerable.ERC721OutOfBoundsIndex.selector, owner, 2));
+        terminusDIDProxy.tokenOfOwnerByIndex(owner, 2);
+    }
 
     // function testFuzzErc721TransferByOwner(bool allowSubdomain) public {
     //     address owner = address(100);
@@ -605,14 +656,9 @@ contract TerminusDIDTest is Test {
     //     terminusDIDProxy.safeTransferFrom(owner, address(receiver), tokenId);
     // }
 
-
-
-
-
-
     // old registrar
 
-       // using DomainUtils for string;
+    // using DomainUtils for string;
 
     // RootResolver public rootResolver;
     // Registrar public registrar;
