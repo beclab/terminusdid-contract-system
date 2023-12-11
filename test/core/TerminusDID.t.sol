@@ -406,23 +406,33 @@ contract TerminusDIDTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function testDefineTag() public {
-        string memory domain = "domain";
-        string memory tagName = "auth_addresses";
+        string memory emptyDomain = "";
+        string memory tagName = "authAddresses";
         // address[]
         bytes memory addressArrayType = ABI.arrayT(bytes.concat(ABI.addressT()));
         string[] memory fieldNames = new string[](0);
 
         // msg.sender is not operator nor domain owner
-        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, domain.tokenId()));
-        terminusDID.defineTag(domain, tagName, addressArrayType, fieldNames);
+        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, emptyDomain.tokenId()));
+        terminusDIDProxy.defineTag(emptyDomain, tagName, addressArrayType, fieldNames);
 
-        // if domain no exist, use operator
+        // define official tag: domain should be empty, only by operator
         vm.prank(_operator);
-        terminusDID.defineTag(domain, tagName, addressArrayType, fieldNames);
+        terminusDIDProxy.defineTag(emptyDomain, tagName, addressArrayType, fieldNames);
+        bytes32 fieldNamesHash = keccak256(abi.encode(fieldNames));
+        (bytes memory gotAbiType, bytes32 gotFieldNamesHash) = terminusDIDProxy.getTagType(emptyDomain, tagName);
+        assertEq0(addressArrayType, gotAbiType);
+        assertEq(fieldNamesHash, gotFieldNamesHash);
 
+        // define user tag: domain owner
+        string memory domain = "domain";
+        address owner = address(100);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, "did", "", true));
+        vm.prank(owner);
+        terminusDIDProxy.defineTag(domain, tagName, addressArrayType, fieldNames);
 
-        // if domain exist, use domain owner
-
+        // 
     }
 
     // function testFuzzSetTag(bool allowSubdomain) public {
