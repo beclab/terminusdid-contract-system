@@ -102,7 +102,7 @@ abstract contract TagRegistry {
         return $.tags[from][to].count();
     }
 
-    function getTagNameAt(string calldata from, string calldata to, uint256 index)
+    function getTagNameByIndex(string calldata from, string calldata to, uint256 index)
         public
         view
         returns (string memory)
@@ -118,7 +118,19 @@ abstract contract TagRegistry {
         returns (bytes memory abiType, bytes32 fieldNamesHash)
     {
         TagType storage $ = __TagRegistry_getStorage().types[domain][name];
+        if ($.abiType.length == 0) {
+            revert UndefinedTag(domain, name);
+        }
         return ($.abiType, $.fieldNamesHash);
+    }
+
+    function getFieldNamesEventBlock(string calldata domain, string calldata name) public view returns (uint256) {
+        __TagRegistry_Storage storage $ = __TagRegistry_getStorage();
+        TagType storage tagType = $.types[domain][name];
+        if (tagType.abiType.length == 0) {
+            revert UndefinedTag(domain, name);
+        }
+        return $.fieldNames.eventBlockNumber(tagType.fieldNamesHash);
     }
 
     function defineTag(
@@ -133,7 +145,7 @@ abstract contract TagRegistry {
         if (tagType.abiType.length > 0) {
             revert RedefinedTag(domain, name);
         }
-        if (!__TagRegistry_isValidName(name)) {
+        if (!__TagRegistry_isValidName(name) || abiType.length > 31) {
             revert InvalidTagDefinition();
         }
         ABI.validateType(abiType);

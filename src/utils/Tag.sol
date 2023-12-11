@@ -62,6 +62,7 @@ library Tag {
         uint16 moveIndex = uint16(self.list.length - 1);
         _deref(self.list[moveIndex]).index = index;
         self.list[index] = self.list[moveIndex];
+        self.list.pop();
         delete self.map[name];
     }
 
