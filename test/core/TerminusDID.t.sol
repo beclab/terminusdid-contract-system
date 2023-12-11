@@ -8,6 +8,7 @@ import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {TerminusDID} from "../../src/core/TerminusDID.sol";
 import {DomainUtils} from "../../src/utils/DomainUtils.sol";
+import {ABI} from "../../src/utils/ABI.sol";
 import {ERC721Receiver, ERC721InvalidReceiver} from "../mocks/ERC721Receiver.sol";
 import {MockTerminusDID} from "../mocks/MockTerminusDID.sol";
 
@@ -400,9 +401,29 @@ contract TerminusDIDTest is Test {
         terminusDIDProxy.register(aOwner, TerminusDID.Metadata(domain, did, "", true));
     }
 
-    // /*//////////////////////////////////////////////////////////////
-    //                          Set tag test
-    // //////////////////////////////////////////////////////////////*/
+    /*//////////////////////////////////////////////////////////////
+                             Set tag test
+    //////////////////////////////////////////////////////////////*/
+
+    function testDefineTag() public {
+        string memory domain = "domain";
+        string memory tagName = "auth_addresses";
+        // address[]
+        bytes memory addressArrayType = ABI.arrayT(bytes.concat(ABI.addressT()));
+        string[] memory fieldNames = new string[](0);
+
+        // msg.sender is not operator nor domain owner
+        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, domain.tokenId()));
+        terminusDID.defineTag(domain, tagName, addressArrayType, fieldNames);
+
+        // if domain no exist, use operator
+        vm.prank(_operator);
+        terminusDID.defineTag(domain, tagName, addressArrayType, fieldNames);
+
+
+        // if domain exist, use domain owner
+
+    }
 
     // function testFuzzSetTag(bool allowSubdomain) public {
     //     address owner = address(100);
@@ -1031,5 +1052,21 @@ contract TerminusDIDTest is Test {
         assertEq(domainLevel, 4);
         assertEq(ownedLevel, 2);
         assertEq(ownedDomain, "b.a");
+    }
+
+    function testIsRegistered() public {
+        string memory did = "did";
+
+        address aOwner = address(100);
+        vm.prank(_operator);
+        terminusDIDProxy.register(aOwner, TerminusDID.Metadata("a", did, "", true));
+
+        address bOwner = address(200);
+        vm.prank(aOwner);
+        terminusDIDProxy.register(bOwner, TerminusDID.Metadata("b.a", did, "", true));
+
+        assertEq(terminusDIDProxy.isRegistered("a"), true);
+        assertEq(terminusDIDProxy.isRegistered("b.a"), true);
+        assertEq(terminusDIDProxy.isRegistered("c.b.a"), false);
     }
 }
