@@ -8,6 +8,7 @@ import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {TerminusDID} from "../../src/core/TerminusDID.sol";
 import {TagRegistry} from "../../src/core/TagRegistry.sol";
+import {ERC721Upgradeable} from "../../src/core/ERC721Upgradeable.sol";
 import {DomainUtils} from "../../src/utils/DomainUtils.sol";
 import {ABI} from "../../src/utils/ABI.sol";
 import {Tag} from "../../src/utils/Tag.sol";
@@ -309,7 +310,7 @@ contract TerminusDIDTest is Test {
         vm.prank(_operator);
         terminusDIDProxy.register(owner, metadata);
 
-        vm.expectRevert(TerminusDID.ExistentDomain.selector);
+        vm.expectRevert(abi.encodeWithSelector(ERC721Upgradeable.ERC721DuplicateToken.selector, domain.tokenId()));
         vm.prank(_operator);
         terminusDIDProxy.register(owner, metadata);
     }
@@ -329,7 +330,7 @@ contract TerminusDIDTest is Test {
         string memory did = "did";
         address owner = address(100);
 
-        vm.expectRevert(TerminusDID.UnregisteredParentDomain.selector);
+        vm.expectRevert(abi.encodeWithSelector(TerminusDID.UnregisteredDomain.selector, "xyz"));
         vm.prank(_operator);
         terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, did, "", allowSubdomain));
     }
@@ -347,7 +348,7 @@ contract TerminusDIDTest is Test {
         // register subdomain fails
         string memory subDomain = "abc.com";
 
-        vm.expectRevert(TerminusDID.DisallowedSubdomain.selector);
+        vm.expectRevert(abi.encodeWithSelector(TerminusDID.InvalidRegistration.selector, subDomain));
         vm.prank(_operator);
         terminusDIDProxy.register(owner, TerminusDID.Metadata(subDomain, did, "", allowSubdomain));
     }
@@ -357,7 +358,7 @@ contract TerminusDIDTest is Test {
         string memory domain = "com.";
         string memory did = "did";
 
-        vm.expectRevert(TerminusDID.UnregisteredParentDomain.selector);
+        vm.expectRevert(abi.encodeWithSelector(TerminusDID.UnregisteredDomain.selector, ""));
         vm.prank(_operator);
         terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, did, "", allowSubdomain));
     }
@@ -402,7 +403,7 @@ contract TerminusDIDTest is Test {
 
         // even contract operator cannot register subdomains without direct parent domain
         vm.prank(_operator);
-        vm.expectRevert(TerminusDID.UnregisteredParentDomain.selector);
+        vm.expectRevert(abi.encodeWithSelector(TerminusDID.UnregisteredDomain.selector, notExistParentDomain));
         terminusDIDProxy.register(aOwner, TerminusDID.Metadata(domain, did, "", true));
     }
 
@@ -415,7 +416,7 @@ contract TerminusDIDTest is Test {
         string memory tagName = "authAddresses";
         // address[]
         bytes memory addressArrayType = ABI.arrayT(bytes.concat(ABI.addressT()));
-        string[] memory fieldNames;
+        string[][] memory fieldNames;
 
         // msg.sender is not operator nor domain owner
         vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, emptyDomain.tokenId()));
@@ -425,9 +426,9 @@ contract TerminusDIDTest is Test {
         vm.prank(_operator);
         terminusDIDProxy.defineTag(emptyDomain, tagName, addressArrayType, fieldNames);
         bytes32 fieldNamesHash = keccak256(abi.encode(fieldNames));
-        (bytes memory gotAbiType, bytes32 gotFieldNamesHash) = terminusDIDProxy.getTagType(emptyDomain, tagName);
+        (bytes memory gotAbiType, bytes32[] memory gotFieldNamesHash) = terminusDIDProxy.getTagType(emptyDomain, tagName);
         assertEq0(addressArrayType, gotAbiType);
-        assertEq(fieldNamesHash, gotFieldNamesHash);
+        assertEq(fieldNamesHash, gotFieldNamesHash[0]);
 
         // define user tag: domain owner
         string memory domain = "domain";
@@ -469,14 +470,16 @@ contract TerminusDIDTest is Test {
         bytes memory tupleType = ABI.tupleT(bytes.concat(ABI.uintT(256), ABI.uintT(256)));
         string memory positonTag = "position";
         vm.prank(owner);
-        string[] memory positionTagName = new string[](2);
-        positionTagName[0] = "x";
-        positionTagName[1] = "y";
+        string[][] memory positionTagName = new string[][](1);
+        positionTagName[0] = new string[](2);
+        positionTagName[0][0] = "x";
+        positionTagName[0][1] = "y";
         terminusDIDProxy.defineTag(domain, positonTag, tupleType, positionTagName);
 
         // invalid fieldNames length: the example need 2 fileds (x and y). test to only provide 1 filed
-        string[] memory wrongPositionTagName = new string[](1);
-        wrongPositionTagName[0] = "x";
+        string[][] memory wrongPositionTagName = new string[][](1);
+        wrongPositionTagName[0] = new string[](1);
+        positionTagName[0][0] = "x";
         string memory wrongPositonTag = "wrongPosition";
         vm.prank(owner);
         vm.expectRevert(TagRegistry.InvalidTagDefinition.selector);
@@ -484,7 +487,7 @@ contract TerminusDIDTest is Test {
 
         // invalid fieldNames: the fields has same name
         vm.prank(owner);
-        positionTagName[1] = "x";
+        positionTagName[0][1] = "x";
         terminusDIDProxy.defineTag(domain, wrongPositonTag, tupleType, positionTagName);
     }
 
@@ -515,7 +518,7 @@ contract TerminusDIDTest is Test {
         string memory emptyDomain = "";
         string memory tagName = "ipV4";
         bytes memory ipV4Type = bytes.concat(ABI.bytesT(4)); // bytes4
-        string[] memory fieldNames; // empty as not tupple type
+        string[][] memory fieldNames; // empty as not tupple type
         vm.prank(_operator);
         terminusDIDProxy.defineTag(emptyDomain, tagName, ipV4Type, fieldNames);
 
@@ -591,7 +594,7 @@ contract TerminusDIDTest is Test {
         string memory emptyDomain = "";
         string memory tagName = "ipV4";
         bytes memory ipV4Type = bytes.concat(ABI.bytesT(4)); // bytes4
-        string[] memory fieldNames; // empty as not tupple type
+        string[][] memory fieldNames; // empty as not tupple type
         vm.prank(_operator);
         terminusDIDProxy.defineTag(emptyDomain, tagName, ipV4Type, fieldNames);
 
@@ -646,7 +649,7 @@ contract TerminusDIDTest is Test {
         // define tag type for user tag: bytes4 as ip v4 address as example
         string memory tagName = "ipV4";
         bytes memory ipV4Type = bytes.concat(ABI.bytesT(4)); // bytes4
-        string[] memory fieldNames; // empty as not tupple type
+        string[][] memory fieldNames; // empty as not tupple type
         vm.prank(owner);
         terminusDIDProxy.defineTag(domain, tagName, ipV4Type, fieldNames);
 
@@ -716,9 +719,10 @@ contract TerminusDIDTest is Test {
         // define type
         string memory tagName = "myTrustedAddresses";
         bytes memory myType = ABI.arrayT(ABI.tupleT(bytes.concat(ABI.stringT(), ABI.addressT())));
-        string[] memory fieldNames = new string[](2);
-        fieldNames[0] = "name";
-        fieldNames[1] = "authAddr";
+        string[][] memory fieldNames = new string[][](1);
+        fieldNames[0] = new string[](2);
+        fieldNames[0][0] = "name";
+        fieldNames[0][1] = "authAddr";
         vm.prank(owner);
         terminusDIDProxy.defineTag(domain, tagName, myType, fieldNames);
 
