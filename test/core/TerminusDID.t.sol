@@ -7,8 +7,10 @@ import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.s
 import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {TerminusDID} from "../../src/core/TerminusDID.sol";
+import {TagRegistry} from "../../src/core/TagRegistry.sol";
 import {DomainUtils} from "../../src/utils/DomainUtils.sol";
 import {ABI} from "../../src/utils/ABI.sol";
+import {Tag} from "../../src/utils/Tag.sol";
 import {ERC721Receiver, ERC721InvalidReceiver} from "../mocks/ERC721Receiver.sol";
 import {MockTerminusDID} from "../mocks/MockTerminusDID.sol";
 
@@ -177,15 +179,18 @@ contract TerminusDIDTest is Test {
         string memory topLevelDomain = "io";
 
         bytes[] memory data = new bytes[](2);
-        data[0] = abi.encodeWithSelector(TerminusDID.register.selector, owner, TerminusDID.Metadata(topLevelDomain, "did", "", true));
-        data[1] = abi.encodeWithSelector(TerminusDID.register.selector, owner, TerminusDID.Metadata(secondLevelDomain, "did", "", true));
-        
+        data[0] = abi.encodeWithSelector(
+            TerminusDID.register.selector, owner, TerminusDID.Metadata(topLevelDomain, "did", "", true)
+        );
+        data[1] = abi.encodeWithSelector(
+            TerminusDID.register.selector, owner, TerminusDID.Metadata(secondLevelDomain, "did", "", true)
+        );
+
         vm.prank(_operator);
         bytes[] memory ret = terminusDIDProxy.multicall(data);
         assertEq(ret.length, 2);
         assertEq(abi.decode(ret[0], (uint256)), topLevelDomain.tokenId());
         assertEq(abi.decode(ret[1], (uint256)), secondLevelDomain.tokenId());
-
 
         TerminusDID.Metadata memory metadataRet;
         address ownerRet;
@@ -410,7 +415,7 @@ contract TerminusDIDTest is Test {
         string memory tagName = "authAddresses";
         // address[]
         bytes memory addressArrayType = ABI.arrayT(bytes.concat(ABI.addressT()));
-        string[] memory fieldNames = new string[](0);
+        string[] memory fieldNames;
 
         // msg.sender is not operator nor domain owner
         vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, emptyDomain.tokenId()));
@@ -432,292 +437,340 @@ contract TerminusDIDTest is Test {
         vm.prank(owner);
         terminusDIDProxy.defineTag(domain, tagName, addressArrayType, fieldNames);
 
-        // 
+        // duplicate define user tag: get RedefinedTag error
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(TagRegistry.RedefinedTag.selector, domain, tagName));
+        terminusDIDProxy.defineTag(domain, tagName, addressArrayType, fieldNames);
+
+        // invalid tag name: should only include 0~9, a~z, A~Z and starts with a~z.
+        string memory invalidTagName = "_age";
+        vm.prank(owner);
+        vm.expectRevert(TagRegistry.InvalidTagDefinition.selector);
+        terminusDIDProxy.defineTag(domain, invalidTagName, addressArrayType, fieldNames);
+
+        // invalid type definition: type length > 31 bytes
+        string memory invalidTagTypeName = "invalidTagType";
+        bytes memory invalidTagType = hex"0987654321098765432109876543210987654321098765432109876543210987";
+        vm.prank(owner);
+        vm.expectRevert(TagRegistry.InvalidTagDefinition.selector);
+        terminusDIDProxy.defineTag(domain, invalidTagTypeName, invalidTagType, fieldNames);
+
+        // invalid type definition: type definition doesnot follow type definition rules of ABI library
+        bytes memory invalidTagType1 = hex"098765432109876543210987654321098765432109876543210987654321";
+        vm.prank(owner);
+        vm.expectRevert(ABI.InvalidType.selector);
+        terminusDIDProxy.defineTag(domain, invalidTagTypeName, invalidTagType1, fieldNames);
+
+        // tuple type:
+        // struct s {
+        //     uint256 x;
+        //     uint256 y;
+        // }
+        bytes memory tupleType = ABI.tupleT(bytes.concat(ABI.uintT(256), ABI.uintT(256)));
+        string memory positonTag = "position";
+        vm.prank(owner);
+        string[] memory positionTagName = new string[](2);
+        positionTagName[0] = "x";
+        positionTagName[1] = "y";
+        terminusDIDProxy.defineTag(domain, positonTag, tupleType, positionTagName);
+
+        // invalid fieldNames length: the example need 2 fileds (x and y). test to only provide 1 filed
+        string[] memory wrongPositionTagName = new string[](1);
+        wrongPositionTagName[0] = "x";
+        string memory wrongPositonTag = "wrongPosition";
+        vm.prank(owner);
+        vm.expectRevert(TagRegistry.InvalidTagDefinition.selector);
+        terminusDIDProxy.defineTag(domain, wrongPositonTag, tupleType, wrongPositionTagName);
+
+        // invalid fieldNames: the fields has same name
+        vm.prank(owner);
+        positionTagName[1] = "x";
+        terminusDIDProxy.defineTag(domain, wrongPositonTag, tupleType, positionTagName);
     }
 
-    // function testFuzzSetTag(bool allowSubdomain) public {
-    //     address owner = address(100);
-    //     Metadata memory metadata = Metadata(_domain, _did, "", allowSubdomain);
-    //     uint256 tokenId = terminusDIDProxy.register(owner, metadata);
+    function testSetTagger() public {
+        string memory emptyDomain = "";
+        string memory tagName = "testAttr";
+        address tagger = address(100);
 
-    //     uint256 key = 0x100;
+        // msg.sender is not operator nor domain owner
+        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, emptyDomain.tokenId()));
+        terminusDIDProxy.setTagger(emptyDomain, tagName, tagger);
 
-    //     bytes memory value = bytes("elephant");
+        // set tagger for ofiicial tag
+        vm.prank(_operator);
+        terminusDIDProxy.setTagger(emptyDomain, tagName, tagger);
 
-    //     bool addedOrRemoved = terminusDIDProxy.setTag(tokenId, key, value);
-    //     assertEq(addedOrRemoved, true);
+        // set tagger for user defined tag
+        string memory domain = "domain";
+        address owner = address(200);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, "did", "", true));
+        vm.prank(owner);
+        terminusDIDProxy.setTagger(domain, tagName, tagger);
+    }
 
-    //     uint256 tagCount = terminusDIDProxy.getTagCount(tokenId);
-    //     assertEq(tagCount, 1);
+    function testAddRemoveUpdateOfficialTag() public {
+        // define tag type for official tag: bytes4 as ip v4 address as example
+        string memory emptyDomain = "";
+        string memory tagName = "ipV4";
+        bytes memory ipV4Type = bytes.concat(ABI.bytesT(4)); // bytes4
+        string[] memory fieldNames; // empty as not tupple type
+        vm.prank(_operator);
+        terminusDIDProxy.defineTag(emptyDomain, tagName, ipV4Type, fieldNames);
 
-    //     uint256[] memory tags = terminusDIDProxy.getTagKeys(tokenId);
-    //     assertEq(tags.length, 1);
-    //     assertEq(tags[0], key);
+        // define tagger for ipV4
+        address tagger = address(100);
+        vm.prank(_operator);
+        terminusDIDProxy.setTagger(emptyDomain, tagName, tagger);
 
-    //     (bool exists, bytes memory valueFromContract) = terminusDIDProxy.getTagValue(tokenId, key);
-    //     assertEq(exists, true);
-    //     assertEq(value, valueFromContract);
-    // }
+        // register a domain
+        string memory domain = "domain";
+        address owner = address(200);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, "did", "", true));
 
-    // function testFuzzSetTagNotByRegistrar(bool allowSubdomain) public {
-    //     address notRegistrar = address(1);
-    //     address owner = address(100);
-    //     Metadata memory metadata = Metadata(_domain, _did, "", allowSubdomain);
-    //     uint256 tokenId = terminusDIDProxy.register(owner, metadata);
+        // add official tag for domain
+        bytes4 ipV4Address = bytes4(hex"ffffffff");
+        bytes memory data = abi.encode(ipV4Address);
+        vm.prank(tagger);
+        terminusDIDProxy.addTag(emptyDomain, domain, tagName, data);
 
-    //     uint256 key = 0x100;
+        // get tag
+        uint256[] memory elePaths; // empty as not tupple type
+        bytes memory gotData = terminusDIDProxy.getTagElem(emptyDomain, domain, tagName, elePaths);
+        assertEq0(data, gotData);
 
-    //     bytes memory value = bytes("elephant");
+        bytes4 gotIpV4Address = abi.decode(gotData, (bytes4));
+        assertEq(gotIpV4Address, ipV4Address);
 
-    //     vm.prank(notRegistrar);
-    //     vm.expectRevert(abi.encodeWithSelector(TerminusDID.UnauthorizedRegistrar.selector, notRegistrar));
-    //     terminusDIDProxy.setTag(tokenId, key, value);
-    // }
+        // update tag
+        bytes4 newIpV4Address = bytes4(hex"00ff11ff");
+        bytes memory newData = abi.encode(newIpV4Address);
+        vm.prank(tagger);
+        terminusDIDProxy.updateTagElem(emptyDomain, domain, tagName, elePaths, newData);
 
-    // function testFuzzSetTagToNotExistedDomain(bool allowSubdomain) public {
-    //     address owner = address(100);
-    //     Metadata memory metadata = Metadata(_domain, _did, "", allowSubdomain);
-    //     terminusDIDProxy.register(owner, metadata);
+        // get tag new value
+        bytes memory gotNewData = terminusDIDProxy.getTagElem(emptyDomain, domain, tagName, elePaths);
+        assertEq0(newData, gotNewData);
 
-    //     uint256 key = 0x100;
-    //     bytes memory value = bytes("elephant");
+        bytes4 gotNewIpV4Address = abi.decode(gotNewData, (bytes4));
+        assertEq(gotNewIpV4Address, newIpV4Address);
 
-    //     string memory nonExistDomain = "hello.com";
-    //     vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, nonExistDomain.tokenId()));
-    //     terminusDIDProxy.setTag(nonExistDomain.tokenId(), key, value);
-    // }
+        // remove tag: not from tagger
+        vm.expectRevert(TerminusDID.Unauthorized.selector);
+        terminusDIDProxy.removeTag(emptyDomain, domain, tagName);
 
-    // function testFuzzSetInvalidKey(bool allowSubdomain) public {
-    //     address owner = address(100);
-    //     Metadata memory metadata = Metadata(_domain, _did, "", allowSubdomain);
-    //     uint256 tokenId = terminusDIDProxy.register(owner, metadata);
+        // remove tag
+        vm.prank(tagger);
+        terminusDIDProxy.removeTag(emptyDomain, domain, tagName);
 
-    //     // maximum allowed key 0xffffffff
-    //     uint256 key = 0x100000000;
-    //     vm.expectRevert(TagRegistryUpgradeable.InvalidTagKey.selector);
-    //     terminusDIDProxy.setTag(tokenId, key, "value");
-    // }
+        // get nonexist tag
+        vm.expectRevert(Tag.TagInvalidOp.selector);
+        terminusDIDProxy.getTagElem(emptyDomain, domain, tagName, elePaths);
 
-    // function testFuzzSetNonExistEmptyTag(bool allowSubdomain) public {
-    //     address owner = address(100);
-    //     Metadata memory metadata = Metadata(_domain, _did, "", allowSubdomain);
-    //     uint256 tokenId = terminusDIDProxy.register(owner, metadata);
+        // remove nonexist tag
+        vm.prank(tagger);
+        vm.expectRevert(Tag.TagInvalidOp.selector);
+        terminusDIDProxy.removeTag(emptyDomain, domain, tagName);
+    }
 
-    //     uint256 key = 0x100;
+    function testAddOfficialTagNotFromEmptyDomain() public {
+        // not from reserved domain, aka, empty domain
+        string memory notEmptyDomain = "notEmptyDomain";
+        string memory domain = "domain";
+        string memory tagName = "ipV4";
+        bytes4 ipV4Address = bytes4(hex"ffffffff");
+        bytes memory data = abi.encode(ipV4Address);
+        vm.expectRevert(TerminusDID.Unauthorized.selector);
+        terminusDIDProxy.addTag(notEmptyDomain, domain, tagName, data);
+    }
 
-    //     bool addedOrRemoved = terminusDIDProxy.setTag(tokenId, key, "");
-    //     assertEq(addedOrRemoved, false);
+    function testAddOfficialTagNotFromEmptyDomainTagger() public {
+        // define tag type for official tag: bytes4 as ip v4 address as example
+        string memory emptyDomain = "";
+        string memory tagName = "ipV4";
+        bytes memory ipV4Type = bytes.concat(ABI.bytesT(4)); // bytes4
+        string[] memory fieldNames; // empty as not tupple type
+        vm.prank(_operator);
+        terminusDIDProxy.defineTag(emptyDomain, tagName, ipV4Type, fieldNames);
 
-    //     uint256 tagCount = terminusDIDProxy.getTagCount(tokenId);
-    //     assertEq(tagCount, 0);
+        // define tagger for ipV4
+        address tagger = address(100);
+        vm.prank(_operator);
+        terminusDIDProxy.setTagger(emptyDomain, tagName, tagger);
 
-    //     (bool exists, bytes memory valueFromContract) = terminusDIDProxy.getTagValue(tokenId, key);
-    //     assertEq(exists, false);
-    //     assertEq(valueFromContract, "");
-    // }
+        // register a domain
+        string memory domain = "domain";
+        address owner = address(200);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, "did", "", true));
 
-    // function testFuzzModityTag(bool allowSubdomain) public {
-    //     address owner = address(100);
-    //     Metadata memory metadata = Metadata(_domain, _did, "", allowSubdomain);
-    //     uint256 tokenId = terminusDIDProxy.register(owner, metadata);
+        // add offical tag for domain: not from the tagger
+        bytes4 ipV4Address = bytes4(hex"ffffffff");
+        bytes memory data = abi.encode(ipV4Address);
+        vm.expectRevert(TerminusDID.Unauthorized.selector);
+        terminusDIDProxy.addTag(emptyDomain, domain, tagName, data);
+    }
 
-    //     uint256 key = 0x100;
+    function testAddTagWithoutTagTypeDefinition() public {
+        string memory emptyDomain = "";
+        string memory tagName = "ipV4";
 
-    //     bytes memory value = bytes("elephant");
+        // define tagger for ipV4
+        address tagger = address(100);
+        vm.prank(_operator);
+        terminusDIDProxy.setTagger(emptyDomain, tagName, tagger);
 
-    //     bool addedOrRemoved;
-    //     addedOrRemoved = terminusDIDProxy.setTag(tokenId, key, value);
-    //     assertEq(addedOrRemoved, true);
+        // register a domain
+        string memory domain = "domain";
+        address owner = address(200);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, "did", "", true));
 
-    //     bytes memory newValue = bytes("tiger");
+        // add offical tag for domain
+        bytes4 ipV4Address = bytes4(hex"ffffffff");
+        bytes memory data = abi.encode(ipV4Address);
+        vm.prank(tagger);
+        vm.expectRevert(abi.encodeWithSelector(TagRegistry.UndefinedTag.selector, emptyDomain, tagName));
+        terminusDIDProxy.addTag(emptyDomain, domain, tagName, data);
+    }
 
-    //     addedOrRemoved = terminusDIDProxy.setTag(tokenId, key, newValue);
-    //     // update is not added or removed
-    //     assertEq(addedOrRemoved, false);
+    function testAddRemoveUserDefinedTag() public {
+        // register a domain
+        string memory domain = "domain";
+        address owner = address(200);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, "did", "", true));
 
-    //     (bool exists, bytes memory valueFromContract) = terminusDIDProxy.getTagValue(tokenId, key);
-    //     assertEq(exists, true);
-    //     assertEq(newValue, valueFromContract);
-    // }
+        // define tag type for user tag: bytes4 as ip v4 address as example
+        string memory tagName = "ipV4";
+        bytes memory ipV4Type = bytes.concat(ABI.bytesT(4)); // bytes4
+        string[] memory fieldNames; // empty as not tupple type
+        vm.prank(owner);
+        terminusDIDProxy.defineTag(domain, tagName, ipV4Type, fieldNames);
 
-    // function testFuzzDeleteTag(bool allowSubdomain) public {
-    //     address owner = address(100);
-    //     Metadata memory metadata = Metadata(_domain, _did, "", allowSubdomain);
-    //     uint256 tokenId = terminusDIDProxy.register(owner, metadata);
+        // define tagger for ipV4
+        address tagger = address(100);
+        vm.prank(owner);
+        terminusDIDProxy.setTagger(domain, tagName, tagger);
 
-    //     uint256 key = 0x100;
+        // add tag for domain itself
+        bytes4 ipV4Address = bytes4(hex"ffffffff");
+        bytes memory data = abi.encode(ipV4Address);
+        vm.prank(tagger);
+        terminusDIDProxy.addTag(domain, domain, tagName, data);
 
-    //     bytes memory value = bytes("elephant");
+        // get tag
+        uint256[] memory elePaths; // empty as not tupple type
+        bytes memory gotData = terminusDIDProxy.getTagElem(domain, domain, tagName, elePaths);
+        assertEq0(data, gotData);
 
-    //     bool addedOrRemoved;
-    //     addedOrRemoved = terminusDIDProxy.setTag(tokenId, key, value);
-    //     assertEq(addedOrRemoved, true);
-    //     uint256[] memory keys;
-    //     keys = terminusDIDProxy.getTagKeys(tokenId);
-    //     assertEq(keys.length, 1);
+        bytes4 gotIpV4Address = abi.decode(gotData, (bytes4));
+        assertEq(gotIpV4Address, ipV4Address);
 
-    //     bytes memory newValue = "";
-    //     addedOrRemoved = terminusDIDProxy.setTag(tokenId, key, newValue);
-    //     assertEq(addedOrRemoved, true);
+        // add tag for domain sub domain
+        string memory subdomain = "sub.domain";
+        vm.prank(tagger);
+        terminusDIDProxy.addTag(domain, subdomain, tagName, data);
 
-    //     (bool exists, bytes memory valueFromContract) = terminusDIDProxy.getTagValue(tokenId, key);
-    //     assertEq(exists, false);
-    //     assertEq(newValue, valueFromContract);
+        // get tag
+        bytes memory gotData1 = terminusDIDProxy.getTagElem(domain, subdomain, tagName, elePaths);
+        assertEq0(data, gotData1);
 
-    //     keys = terminusDIDProxy.getTagKeys(tokenId);
-    //     assertEq(keys.length, 0);
-    // }
+        bytes4 gotIpV4Address1 = abi.decode(gotData1, (bytes4));
+        assertEq(gotIpV4Address1, ipV4Address);
 
-    // function testFuzzDeleteTagMoveIndex(bool allowSubdomain) public {
-    //     address owner = address(100);
-    //     Metadata memory metadata = Metadata(_domain, _did, "", allowSubdomain);
-    //     uint256 tokenId = terminusDIDProxy.register(owner, metadata);
+        // add tag not from tagger
+        vm.expectRevert(TerminusDID.Unauthorized.selector);
+        terminusDIDProxy.addTag(domain, domain, tagName, data);
 
-    //     terminusDIDProxy.setTag(tokenId, 0x100, bytes("CN"));
-    //     terminusDIDProxy.setTag(tokenId, 0x101, bytes("M"));
-    //     terminusDIDProxy.setTag(tokenId, 0x102, bytes("beijing"));
-    //     terminusDIDProxy.setTag(tokenId, 0x103, bytes("haidian"));
+        // add tag to domain which is not subdomain
+        string memory notSubdomain = "not.subdomain";
+        vm.prank(tagger);
+        vm.expectRevert(TerminusDID.Unauthorized.selector);
+        terminusDIDProxy.addTag(domain, notSubdomain, tagName, data);
 
-    //     terminusDIDProxy.setTag(tokenId, 0x101, "");
-    //     uint256[] memory keys = terminusDIDProxy.getTagKeys(tokenId);
-    //     assertEq(keys.length, 3);
-    //     for (uint256 index; index < keys.length; index++) {
-    //         assertNotEq(keys[index], 0x101);
-    //     }
+        // remove tag
+        vm.prank(tagger);
+        terminusDIDProxy.removeTag(domain, subdomain, tagName);
 
-    //     (bool exists, bytes memory value) = terminusDIDProxy.getTagValue(tokenId, 0x101);
-    //     assertEq(exists, false);
-    //     assertEq(value, "");
-    // }
-      // /*//////////////////////////////////////////////////////////////
-    //                          Set tag test
-    // //////////////////////////////////////////////////////////////*/
-    // function testSetTag() public {
-    //     address aOwner = address(100);
-    //     string memory did = "did";
-    //     string memory domain = "a";
-    //     vm.prank(operator);
-    //     registrar.register(aOwner, Metadata(domain, did, "", true));
+        // get nonexist tag
+        vm.expectRevert(Tag.TagInvalidOp.selector);
+        terminusDIDProxy.getTagElem(domain, subdomain, tagName, elePaths);
+    }
 
-    //     uint256 key = 0x12;
-    //     bytes memory value =
-    //         hex"3082010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001";
+    struct MyTrustedAddress {
+        string name;
+        address authAddr;
+    }
+    // S[] s
 
-    //     vm.prank(operator);
-    //     registrar.setTag(domain, key, value);
+    function testAddStructTypeTag() public {
+        // register a domain
+        string memory domain = "domain";
+        address owner = address(200);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, "did", "", true));
 
-    //     uint256 tokenId = domain.tokenId();
-    //     bool exists;
-    //     bytes memory valueRet;
-    //     (exists, valueRet) = registryProxy.getTagValue(tokenId, key);
+        // define type
+        string memory tagName = "myTrustedAddresses";
+        bytes memory myType = ABI.arrayT(ABI.tupleT(bytes.concat(ABI.stringT(), ABI.addressT())));
+        string[] memory fieldNames = new string[](2);
+        fieldNames[0] = "name";
+        fieldNames[1] = "authAddr";
+        vm.prank(owner);
+        terminusDIDProxy.defineTag(domain, tagName, myType, fieldNames);
 
-    //     assertEq(exists, true);
-    //     assertEq(valueRet, value);
+        // define tagger
+        address tagger = address(100);
+        vm.prank(owner);
+        terminusDIDProxy.setTagger(domain, tagName, tagger);
 
-    //     // operator can set any tag, even not defined by resolver
-    //     vm.prank(operator);
-    //     registrar.setTag(domain, 0x100, bytes("little baby"));
-    //     (exists, valueRet) = registryProxy.getTagValue(tokenId, 0x100);
-    //     assertEq(exists, true);
-    //     assertEq(valueRet, bytes("little baby"));
+        // add tag for domain itself
+        MyTrustedAddress[] memory myTrustedAddresses = new MyTrustedAddress[](1);
+        MyTrustedAddress memory myTrustedAddress0 = MyTrustedAddress({name: "golden treasure", authAddr: address(300)});
+        myTrustedAddresses[0] = myTrustedAddress0;
+        bytes memory data = abi.encode(myTrustedAddresses);
+        vm.prank(tagger);
+        terminusDIDProxy.addTag(domain, domain, tagName, data);
 
-    //     // operator can delete tag
-    //     vm.prank(operator);
-    //     registrar.setTag(domain, 0x100, "");
-    //     (exists, valueRet) = registryProxy.getTagValue(tokenId, 0x100);
-    //     assertEq(exists, false);
-    //     assertEq(valueRet, "");
-    // }
+        // get tag
+        uint256[] memory elePaths; // empty indicates to get all data
+        bytes memory gotData = terminusDIDProxy.getTagElem(domain, domain, tagName, elePaths);
+        assertEq0(data, gotData);
 
-    // function testSetTagForMultiLevels() public {
-    //     // set domian DNS A Record
-    //     uint256 key = 0x13;
-    //     bytes memory value = hex"c0a80101";
-    //     string memory did = "did";
+        MyTrustedAddress[] memory gotMyTrustedAddresses = abi.decode(gotData, (MyTrustedAddress[]));
+        assertEq(gotMyTrustedAddresses.length, 1);
+        assertEq(gotMyTrustedAddresses[0].name, "golden treasure");
+        assertEq(gotMyTrustedAddresses[0].authAddr, address(300));
 
-    //     address aOwner = address(100);
-    //     vm.prank(operator);
-    //     registrar.register(aOwner, Metadata("a", did, "", true));
-    //     vm.prank(operator);
-    //     registrar.setTag("a", key, value);
+        // get first element in tag
+        uint256[] memory ele0Path = new uint256[](1);
+        ele0Path[0] = 0;
+        bytes memory gotElement0Data = terminusDIDProxy.getTagElem(domain, domain, tagName, ele0Path);
+        MyTrustedAddress memory element0 = abi.decode(gotElement0Data, (MyTrustedAddress));
+        assertEq(element0.name, "golden treasure");
+        assertEq(element0.authAddr, address(300));
 
-    //     address bOwner = address(200);
-    //     vm.prank(operator);
-    //     registrar.register(bOwner, Metadata("b.a", did, "", true));
-    //     vm.prank(operator);
-    //     registrar.setTag("b.a", key, value);
+        // get first element's name in tag
+        uint256[] memory ele00Path = new uint256[](2);
+        ele00Path[0] = 0;
+        ele00Path[1] = 0;
+        bytes memory gotElement00Data = terminusDIDProxy.getTagElem(domain, domain, tagName, ele00Path);
+        string memory element0Name = abi.decode(gotElement00Data, (string));
+        assertEq(element0Name, "golden treasure");
 
-    //     address cOwner = address(300);
-    //     vm.prank(operator);
-    //     registrar.register(cOwner, Metadata("c.b.a", did, "", true));
-    //     vm.prank(operator);
-    //     registrar.setTag("c.b.a", key, value);
+        // push new elements into array tag
+        uint256 len = terminusDIDProxy.getTagElemLength(domain, domain, tagName, elePaths);
+        assertEq(len, 1);
+        MyTrustedAddress memory myTrustedAddress1 = MyTrustedAddress({name: "silver treasure", authAddr: address(400)});
+        vm.prank(tagger);
+        terminusDIDProxy.pushTagElem(domain, domain, tagName, elePaths, abi.encode(myTrustedAddress1));
+        assertEq(terminusDIDProxy.getTagElemLength(domain, domain, tagName, elePaths), 2);
 
-    //     address dOwner = address(400);
-    //     vm.prank(operator);
-    //     registrar.register(dOwner, Metadata("d.c.b.a", did, "", true));
-    //     vm.prank(operator);
-    //     registrar.setTag("d.c.b.a", key, value);
-
-    //     address eOwner = address(500);
-    //     vm.prank(operator);
-    //     registrar.register(eOwner, Metadata("e.d.c.b.a", did, "", true));
-    //     vm.prank(operator);
-    //     registrar.setTag("e.d.c.b.a", key, value);
-    // }
-
-    // function testSetTagUnauthorized() public {
-    //     uint256 key = 0x13;
-    //     bytes memory value = hex"c0a80101";
-    //     string memory did = "did";
-
-    //     address aOwner = address(100);
-    //     vm.prank(operator);
-    //     registrar.register(aOwner, Metadata("a", did, "", true));
-
-    //     address notOperator = address(200);
-    //     vm.prank(notOperator);
-    //     vm.expectRevert(Registrar.Unauthorized.selector);
-    //     registrar.setTag("a", key, value);
-    // }
-
-    // function testSetTagToDomainNotExists() public {
-    //     uint256 key = 0x13;
-    //     bytes memory value = hex"c0a80101";
-    //     string memory did = "did";
-
-    //     address aOwner = address(100);
-    //     vm.prank(operator);
-    //     registrar.register(aOwner, Metadata("a", did, "", true));
-
-    //     string memory notExistParentDomain = "b.a";
-    //     vm.prank(operator);
-    //     vm.expectRevert(
-    //         abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, notExistParentDomain.tokenId())
-    //     );
-    //     registrar.setTag(notExistParentDomain, key, value);
-    // }
-
-    // function testSetTagByResolver() public {
-    //     address aOwner = address(100);
-    //     string memory did = "did";
-    //     string memory domain = "a";
-    //     vm.prank(operator);
-    //     registrar.register(aOwner, Metadata(domain, did, "", true));
-
-    //     uint256 key = 0x12;
-    //     bytes memory value =
-    //         hex"3082010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001";
-
-    //     vm.prank(address(rootResolver));
-    //     registrar.setTag(domain, key, value);
-
-    //     uint256 tokenId = domain.tokenId();
-    //     (bool exists, bytes memory valueRet) = registryProxy.getTagValue(tokenId, key);
-
-    //     assertEq(exists, true);
-    //     assertEq(valueRet, value);
-    // }
+        // pop element from array tag
+    }
 
     /*//////////////////////////////////////////////////////////////
                              ERC721 test
