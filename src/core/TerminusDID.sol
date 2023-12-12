@@ -44,13 +44,11 @@ contract TerminusDID is
 
     event TransferByParentOwner(uint256 indexed tokenId);
 
-    error UnregisteredParentDomain();
+    error InvalidDomainLabel(string label);
 
-    error DisallowedSubdomain();
+    error UnregisteredDomain(string domain);
 
-    error InvalidDomainLabel();
-
-    error ExistentDomain();
+    error InvalidRegistration(string domain);
 
     error Unauthorized();
 
@@ -94,11 +92,11 @@ contract TerminusDID is
         if (from == caller || __ERC721_isApprovedForAll(from, caller) || approved == caller) {
             return;
         }
-        if (caller == owner()) {
+        if (caller == operator()) {
             emit TransferBySuperAdmin(tokenId);
             return;
         }
-        if (_isParentOwner(caller, _getStorage().metadata[tokenId].domain)) {
+        if (_traceOwner(caller, _getStorage().metadata[tokenId].domain.parent())) {
             emit TransferByParentOwner(tokenId);
             return;
         }
@@ -122,7 +120,7 @@ contract TerminusDID is
      * @notice Traces all levels of a domain and checks if an address is the owner of any level.
      *
      * @return domainLevel Level of `domain`.
-     * @return ownedLevel  Level of the longest domain owned by `owner` in the tracing chain.
+     * @return ownedLevel  Level of `ownedDomain` as defined below.
      * @return ownedDomain The longest domain owned by `owner` in the tracing chain.
      *
      * Example: `traceOwner("a.b.c", addr)` returns
@@ -134,10 +132,13 @@ contract TerminusDID is
         view
         returns (uint256 domainLevel, uint256 ownedLevel, string memory ownedDomain)
     {
+        if (!isRegistered(domain)) {
+            revert UnregisteredDomain(domain);
+        }
         for (DomainUtils.Slice ds = domain.asSlice(); !ds.isEmpty(); ds = ds.parent()) {
             if (ownedLevel > 0) {
                 ++ownedLevel;
-            } else if (ownerOf(ds.tokenId()) == owner) {
+            } else if (__ERC721_owner(ds.tokenId()) == owner) {
                 ownedLevel = 1;
                 ownedDomain = ds.toString();
             }
@@ -146,34 +147,38 @@ contract TerminusDID is
     }
 
     function register(address tokenOwner, Metadata calldata metadata) public returns (uint256 tokenId) {
-        address caller = _msgSender();
-        if (!(caller == operator() || _isParentOwner(caller, metadata.domain))) {
-            revert Unauthorized();
-        }
-
         (DomainUtils.Slice label, DomainUtils.Slice parent, bool hasParent) = metadata.domain.cut();
 
         if (hasParent) {
             Metadata storage parentData = _getStorage().metadata[parent.tokenId()];
             if (parentData.domain.isEmpty()) {
-                revert UnregisteredParentDomain();
+                revert UnregisteredDomain(parent.toString());
             }
             if (!parentData.allowSubdomain) {
-                revert DisallowedSubdomain();
+                revert InvalidRegistration(metadata.domain);
             }
         }
 
+        address caller = _msgSender();
+        if (!(caller == operator() || _traceOwner(caller, parent))) {
+            revert Unauthorized();
+        }
+
         if (!label.isValidLabel()) {
-            revert InvalidDomainLabel();
+            revert InvalidDomainLabel(label.toString());
         }
 
         tokenId = metadata.domain.tokenId();
         if (!_getStorage().metadata[tokenId].domain.isEmpty()) {
-            revert ExistentDomain();
+            revert InvalidRegistration(metadata.domain);
         }
         _getStorage().metadata[tokenId] = metadata;
 
         __ERC721_mint(tokenOwner, tokenId);
+    }
+
+    function getTagger(string calldata domain, string calldata name) public view returns (address) {
+        return _getStorage().taggers[domain][name];
     }
 
     function setTagger(string calldata domain, string calldata name, address tagger) public {
@@ -186,13 +191,16 @@ contract TerminusDID is
         if (domain.isEmpty() && caller == operator()) {
             return;
         }
-        if (caller == ownerOf(domain.tokenId())) {
+        if (caller == __ERC721_owner(domain.tokenId())) {
             return;
         }
         revert Unauthorized();
     }
 
     function _authorizeSetTag(string calldata from, string calldata to, string calldata name) internal view override {
+        if (!isRegistered(to)) {
+            revert UnregisteredDomain(to);
+        }
         if (!(_allowSetTag(from, to) && _msgSender() == _getStorage().taggers[from][name])) {
             revert Unauthorized();
         }
@@ -200,9 +208,9 @@ contract TerminusDID is
 
     function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {}
 
-    function _isParentOwner(address addr, string memory domain) private view returns (bool) {
-        for (DomainUtils.Slice ds = domain.parent(); !ds.isEmpty(); ds = ds.parent()) {
-            if (ownerOf(ds.tokenId()) == addr) {
+    function _traceOwner(address addr, DomainUtils.Slice ds) private view returns (bool) {
+        for (; !ds.isEmpty(); ds = ds.parent()) {
+            if (__ERC721_owner(ds.tokenId()) == addr) {
                 return true;
             }
         }

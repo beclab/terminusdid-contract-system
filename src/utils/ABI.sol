@@ -118,9 +118,22 @@ library ABI {
         }
     }
 
-    function totalTupleFields(bytes memory typ) internal pure returns (uint256) {
-        (uint256 count,) = _tupleFieldsCount(typ, 0);
-        return count;
+    function countTupleFieldsPreorder(bytes memory typ) internal pure returns (uint16[] memory) {
+        uint16[] memory counts;
+        uint256 p;
+        assembly {
+            counts := mload(0x40)
+            p := add(32, counts)
+        }
+        (uint256 p_, uint256 i) = _countTupleFieldsPreorder(p, typ, 0);
+        if (i != typ.length) {
+            revert InvalidType();
+        }
+        assembly {
+            mstore(counts, shr(5, sub(p_, p)))
+            mstore(0x40, p_)
+        }
+        return counts;
     }
 
     function bind(Var storage self, bytes memory typ) internal pure returns (ReflectVar memory) {
@@ -1043,28 +1056,33 @@ library ABI {
         return (pMeta, i);
     }
 
-    function _tupleFieldsCount(bytes memory typ, uint256 i) private pure returns (uint256 count, uint256 i_) {
+    function _countTupleFieldsPreorder(uint256 p, bytes memory typ, uint256 i)
+        private
+        pure
+        returns (uint256 p_, uint256 i_)
+    {
         bytes1 t = _read1(typ, i);
 
         if (t == DYNAMIC_ARRAY_T) {
-            return _tupleFieldsCount(typ, i + 1);
+            return _countTupleFieldsPreorder(p, typ, i + 1);
         } else if (t == FIXED_ARRAY_T) {
             _readArrayTupleLength(typ, i + 1);
-            return _tupleFieldsCount(typ, i + 3);
+            return _countTupleFieldsPreorder(p, typ, i + 3);
         } else if (t == TUPLE_T) {
-            uint16 len = _readArrayTupleLength(typ, i + 1);
-            i += 3;
-            for (uint16 j = 0; j < len; ++j) {
-                uint256 n;
-                (n, i) = _tupleFieldsCount(typ, i);
-                count += n;
+            uint256 len = _readArrayTupleLength(typ, i + 1);
+            assembly {
+                mstore(p, len)
+                p := add(32, p)
             }
-            count += len;
+            i += 3;
+            for (uint256 j = 0; j < len; ++j) {
+                (p, i) = _countTupleFieldsPreorder(p, typ, i);
+            }
         } else {
             i = _typeEnd(typ, i);
         }
 
-        return (count, i);
+        return (p, i);
     }
 
     function _typeEnd(bytes memory typ, uint256 i) private pure returns (uint256) {

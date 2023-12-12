@@ -16,7 +16,7 @@ abstract contract TagRegistry {
 
     struct TagType {
         bytes abiType;
-        bytes32 fieldNamesHash;
+        bytes32[] fieldNamesHash;
     }
 
     /// @custom:storage-location erc7201:terminus.TagRegistry
@@ -115,7 +115,7 @@ abstract contract TagRegistry {
     function getTagType(string calldata domain, string calldata name)
         public
         view
-        returns (bytes memory abiType, bytes32 fieldNamesHash)
+        returns (bytes memory abiType, bytes32[] memory fieldNamesHash)
     {
         TagType storage $ = __TagRegistry_getStorage().types[domain][name];
         if ($.abiType.length == 0) {
@@ -124,40 +124,64 @@ abstract contract TagRegistry {
         return ($.abiType, $.fieldNamesHash);
     }
 
-    function getFieldNamesEventBlock(string calldata domain, string calldata name) public view returns (uint256) {
-        __TagRegistry_Storage storage $ = __TagRegistry_getStorage();
-        TagType storage tagType = $.types[domain][name];
-        if (tagType.abiType.length == 0) {
+    function getTagABIType(string calldata domain, string calldata name) public view returns (bytes memory) {
+        TagType storage $ = __TagRegistry_getStorage().types[domain][name];
+        if ($.abiType.length == 0) {
             revert UndefinedTag(domain, name);
         }
-        return $.fieldNames.eventBlockNumber(tagType.fieldNamesHash);
+        return $.abiType;
+    }
+
+    function getTagFieldNamesHashByIndex(string calldata domain, string calldata name, uint256 index)
+        public
+        view
+        returns (bytes32)
+    {
+        TagType storage $ = __TagRegistry_getStorage().types[domain][name];
+        if ($.abiType.length == 0) {
+            revert UndefinedTag(domain, name);
+        }
+        return $.fieldNamesHash[index];
+    }
+
+    function getFieldNamesEventBlock(bytes32 hash) public view returns (uint256) {
+        __TagRegistry_Storage storage $ = __TagRegistry_getStorage();
+        return $.fieldNames.eventBlockNumber(hash);
     }
 
     function defineTag(
         string calldata domain,
         string calldata name,
         bytes calldata abiType,
-        string[] calldata fieldNames
+        string[][] calldata fieldNames
     ) public {
         _authorizeDefineTag(domain);
         __TagRegistry_Storage storage $ = __TagRegistry_getStorage();
         TagType storage tagType = $.types[domain][name];
+
         if (tagType.abiType.length > 0) {
             revert RedefinedTag(domain, name);
         }
         if (!__TagRegistry_isValidName(name) || abiType.length > 31) {
             revert InvalidTagDefinition();
         }
-        ABI.validateType(abiType);
-        if (ABI.totalTupleFields(abiType) != fieldNames.length) {
+
+        uint16[] memory fieldCounts = ABI.countTupleFieldsPreorder(abiType);
+        if (fieldNames.length != fieldCounts.length) {
             revert InvalidTagDefinition();
         }
+        bytes32[] memory fieldNamesHash = new bytes32[](fieldNames.length);
+
         for (uint256 i = 0; i < fieldNames.length; ++i) {
-            if (!__TagRegistry_isValidName(fieldNames[i])) {
+            string[] calldata fieldNameList = fieldNames[i];
+            if (fieldNameList.length != fieldCounts[i]) {
                 revert InvalidTagDefinition();
             }
+
+            __TagRegistry_validateFieldNames(fieldNameList);
+            (fieldNamesHash[i],) = $.fieldNames.add(fieldNameList);
         }
-        (bytes32 fieldNamesHash,) = $.fieldNames.add(fieldNames);
+
         tagType.abiType = abiType;
         tagType.fieldNamesHash = fieldNamesHash;
     }
@@ -166,14 +190,41 @@ abstract contract TagRegistry {
 
     function _authorizeSetTag(string calldata from, string calldata to, string calldata name) internal virtual;
 
-    function __TagRegistry_isValidName(string memory fieldName) private pure returns (bool) {
+    function __TagRegistry_validateFieldNames(string[] calldata fieldNames) private pure {
+        for (uint256 i = 0; i < fieldNames.length; ++i) {
+            string calldata fieldName = fieldNames[i];
+            if (!__TagRegistry_isValidName(fieldName)) {
+                revert InvalidTagDefinition();
+            }
+
+            bytes32 s;
+            assembly {
+                s := calldataload(fieldName.offset)
+                if shr(shl(3, fieldName.length), s) { revert(0, 0) }
+            }
+            for (uint256 j = 0; j < i; ++j) {
+                string calldata fieldNameUsed = fieldNames[j];
+                if (bytes(fieldNameUsed).length == bytes(fieldName).length) {
+                    bytes32 diff;
+                    assembly {
+                        diff := xor(s, calldataload(fieldNameUsed.offset))
+                    }
+                    if (diff == 0) {
+                        revert InvalidTagDefinition();
+                    }
+                }
+            }
+        }
+    }
+
+    function __TagRegistry_isValidName(string calldata fieldName) private pure returns (bool) {
         uint256 len = bytes(fieldName).length;
         if (len == 0 || len > 31) {
             return false;
         }
         bytes32 s;
         assembly {
-            s := mload(add(32, fieldName))
+            s := calldataload(fieldName.offset)
         }
         uint8 c0 = uint8(s[0]);
         if (c0 < 0x61 || c0 > 0x7a) {

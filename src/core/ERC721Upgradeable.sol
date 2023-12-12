@@ -42,7 +42,7 @@ abstract contract ERC721Upgradeable is
 
     error ERC721OutOfBoundsIndex(address owner, uint256 index);
 
-    error ERC721ExistentToken(uint256 tokenId);
+    error ERC721DuplicateToken(uint256 tokenId);
 
     function __ERC721_init(string memory name_, string memory symbol_) internal onlyInitializing {
         __ERC721_init_unchained(name_, symbol_);
@@ -186,7 +186,7 @@ abstract contract ERC721Upgradeable is
 
     function __ERC721_mint(address to, uint256 tokenId) internal {
         if (__ERC721_owner(tokenId) != address(0)) {
-            revert ERC721ExistentToken(tokenId);
+            revert ERC721DuplicateToken(tokenId);
         }
         if (to == address(0)) {
             revert ERC721InvalidReceiver(address(0));
