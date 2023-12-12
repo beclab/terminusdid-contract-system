@@ -200,7 +200,7 @@ abstract contract TagRegistry {
             bytes32 s;
             assembly {
                 s := calldataload(fieldName.offset)
-                if shr(shl(3, fieldName.length), s) { revert(0, 0) }
+                if shl(shl(3, fieldName.length), s) { revert(0, 0) }
             }
             for (uint256 j = 0; j < i; ++j) {
                 string calldata fieldNameUsed = fieldNames[j];

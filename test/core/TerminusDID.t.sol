@@ -310,7 +310,7 @@ contract TerminusDIDTest is Test {
         vm.prank(_operator);
         terminusDIDProxy.register(owner, metadata);
 
-        vm.expectRevert(abi.encodeWithSelector(ERC721Upgradeable.ERC721DuplicateToken.selector, domain.tokenId()));
+        vm.expectRevert(abi.encodeWithSelector(TerminusDID.InvalidRegistration.selector, domain));
         vm.prank(_operator);
         terminusDIDProxy.register(owner, metadata);
     }
@@ -369,7 +369,7 @@ contract TerminusDIDTest is Test {
 
         address owner = address(100);
 
-        vm.expectRevert(TerminusDID.InvalidDomainLabel.selector);
+        vm.expectRevert(abi.encodeWithSelector(TerminusDID.InvalidDomainLabel.selector, domain));
         vm.prank(_operator);
         terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, did, "", allowSubdomain));
     }
@@ -379,7 +379,7 @@ contract TerminusDIDTest is Test {
         string memory domain = "";
         string memory did = "did";
 
-        vm.expectRevert(TerminusDID.InvalidDomainLabel.selector);
+        vm.expectRevert(abi.encodeWithSelector(TerminusDID.InvalidDomainLabel.selector, domain));
         vm.prank(_operator);
         terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, did, "", allowSubdomain));
     }
@@ -396,9 +396,7 @@ contract TerminusDIDTest is Test {
         domain = "c.b.a";
         string memory notExistParentDomain = "b.a";
         vm.prank(aOwner);
-        vm.expectRevert(
-            abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, notExistParentDomain.tokenId())
-        );
+        vm.expectRevert(abi.encodeWithSelector(TerminusDID.UnregisteredDomain.selector, notExistParentDomain));
         terminusDIDProxy.register(aOwner, TerminusDID.Metadata(domain, did, "", true));
 
         // even contract operator cannot register subdomains without direct parent domain
@@ -419,16 +417,16 @@ contract TerminusDIDTest is Test {
         string[][] memory fieldNames;
 
         // msg.sender is not operator nor domain owner
-        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, emptyDomain.tokenId()));
+        vm.expectRevert(TerminusDID.Unauthorized.selector);
         terminusDIDProxy.defineTag(emptyDomain, tagName, addressArrayType, fieldNames);
 
         // define official tag: domain should be empty, only by operator
         vm.prank(_operator);
         terminusDIDProxy.defineTag(emptyDomain, tagName, addressArrayType, fieldNames);
-        bytes32 fieldNamesHash = keccak256(abi.encode(fieldNames));
-        (bytes memory gotAbiType, bytes32[] memory gotFieldNamesHash) = terminusDIDProxy.getTagType(emptyDomain, tagName);
+        (bytes memory gotAbiType, bytes32[] memory gotFieldNamesHash) =
+            terminusDIDProxy.getTagType(emptyDomain, tagName);
         assertEq0(addressArrayType, gotAbiType);
-        assertEq(fieldNamesHash, gotFieldNamesHash[0]);
+        assertEq(gotFieldNamesHash.length, 0);
 
         // define user tag: domain owner
         string memory domain = "domain";
@@ -488,6 +486,7 @@ contract TerminusDIDTest is Test {
         // invalid fieldNames: the fields has same name
         vm.prank(owner);
         positionTagName[0][1] = "x";
+        vm.expectRevert(TagRegistry.InvalidTagDefinition.selector);
         terminusDIDProxy.defineTag(domain, wrongPositonTag, tupleType, positionTagName);
     }
 
@@ -497,7 +496,7 @@ contract TerminusDIDTest is Test {
         address tagger = address(100);
 
         // msg.sender is not operator nor domain owner
-        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721NonexistentToken.selector, emptyDomain.tokenId()));
+        vm.expectRevert(TerminusDID.Unauthorized.selector);
         terminusDIDProxy.setTagger(emptyDomain, tagName, tagger);
 
         // set tagger for ofiicial tag
@@ -511,6 +510,10 @@ contract TerminusDIDTest is Test {
         terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, "did", "", true));
         vm.prank(owner);
         terminusDIDProxy.setTagger(domain, tagName, tagger);
+
+        // get tagger
+        address gotTagger = terminusDIDProxy.getTagger(domain, tagName);
+        assertEq(gotTagger, tagger);
     }
 
     function testAddRemoveUpdateOfficialTag() public {
@@ -579,9 +582,14 @@ contract TerminusDIDTest is Test {
     }
 
     function testAddOfficialTagNotFromEmptyDomain() public {
+        // register a domain
+        string memory domain = "domain";
+        address owner = address(200);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, "did", "", true));
+
         // not from reserved domain, aka, empty domain
         string memory notEmptyDomain = "notEmptyDomain";
-        string memory domain = "domain";
         string memory tagName = "ipV4";
         bytes4 ipV4Address = bytes4(hex"ffffffff");
         bytes memory data = abi.encode(ipV4Address);
@@ -672,8 +680,17 @@ contract TerminusDIDTest is Test {
         bytes4 gotIpV4Address = abi.decode(gotData, (bytes4));
         assertEq(gotIpV4Address, ipV4Address);
 
-        // add tag for domain sub domain
+        // get error if subdomain is not registered yet
         string memory subdomain = "sub.domain";
+        vm.prank(tagger);
+        vm.expectRevert(abi.encodeWithSelector(TerminusDID.UnregisteredDomain.selector, subdomain));
+        terminusDIDProxy.addTag(domain, subdomain, tagName, data);
+
+        // register subdomain
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(subdomain, "did", "", true));
+
+        // add tag for domain sub domain
         vm.prank(tagger);
         terminusDIDProxy.addTag(domain, subdomain, tagName, data);
 
@@ -689,7 +706,9 @@ contract TerminusDIDTest is Test {
         terminusDIDProxy.addTag(domain, domain, tagName, data);
 
         // add tag to domain which is not subdomain
-        string memory notSubdomain = "not.subdomain";
+        string memory notSubdomain = "notSubdomain";
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(notSubdomain, "did", "", true));
         vm.prank(tagger);
         vm.expectRevert(TerminusDID.Unauthorized.selector);
         terminusDIDProxy.addTag(domain, notSubdomain, tagName, data);
