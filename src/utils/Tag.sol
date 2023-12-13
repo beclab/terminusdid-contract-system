@@ -40,6 +40,11 @@ library Tag {
         return entry.value;
     }
 
+    function has(Group storage self, string memory name) internal view returns (bool) {
+        Entry storage entry = self.map[name];
+        return bytes(entry.name).length > 0;
+    }
+
     function get(Group storage self, string memory name) internal view returns (ABI.Var storage) {
         Entry storage entry = self.map[name];
         if (bytes(entry.name).length == 0) {

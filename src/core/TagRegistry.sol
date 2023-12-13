@@ -35,6 +35,10 @@ abstract contract TagRegistry {
 
     error InvalidTagDefinition();
 
+    function hasTag(string calldata from, string calldata to, string calldata name) public view returns (bool) {
+        return __TagRegistry_getStorage().tags[from][to].has(name);
+    }
+
     function addTag(string calldata from, string calldata to, string calldata name, bytes calldata value) public {
         _authorizeSetTag(from, to, name);
         __TagRegistry_Storage storage $ = __TagRegistry_getStorage();
