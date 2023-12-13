@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.21;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console, Vm} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
@@ -680,7 +680,7 @@ contract TerminusDIDTest is Test {
         bytes4 gotIpV4Address = abi.decode(gotData, (bytes4));
         assertEq(gotIpV4Address, ipV4Address);
 
-        // get error if subdomain is not registered yet
+        // add tag get error if subdomain is not registered yet
         string memory subdomain = "sub.domain";
         vm.prank(tagger);
         vm.expectRevert(abi.encodeWithSelector(TerminusDID.UnregisteredDomain.selector, subdomain));
@@ -792,7 +792,221 @@ contract TerminusDIDTest is Test {
         terminusDIDProxy.pushTagElem(domain, domain, tagName, elePaths, abi.encode(myTrustedAddress1));
         assertEq(terminusDIDProxy.getTagElemLength(domain, domain, tagName, elePaths), 2);
 
+        ele0Path[0] = 1;
+        bytes memory gotElement1Data = terminusDIDProxy.getTagElem(domain, domain, tagName, ele0Path);
+        MyTrustedAddress memory element1 = abi.decode(gotElement1Data, (MyTrustedAddress));
+        assertEq(element1.name, "silver treasure");
+        assertEq(element1.authAddr, address(400));
+
         // pop element from array tag
+        vm.prank(tagger);
+        terminusDIDProxy.popTagElem(domain, domain, tagName, elePaths);
+        assertEq(terminusDIDProxy.getTagElemLength(domain, domain, tagName, elePaths), 1);
+
+        ele0Path[0] = 0;
+        gotElement0Data = terminusDIDProxy.getTagElem(domain, domain, tagName, ele0Path);
+        element0 = abi.decode(gotElement0Data, (MyTrustedAddress));
+        assertEq(element0.name, "golden treasure");
+        assertEq(element0.authAddr, address(300));
+    }
+
+    function testAddMultipleTags() public {
+        string memory emptyDomain = "";
+        string[][] memory fieldNames;
+
+        // define address[] tag type
+        string memory authAddressesTagName = "authAddresses";
+        bytes memory addressArrayType = ABI.arrayT(bytes.concat(ABI.addressT()));
+        vm.prank(_operator);
+        terminusDIDProxy.defineTag(emptyDomain, authAddressesTagName, addressArrayType, fieldNames);
+
+        // define bytes tag type
+        string memory rsaPubKeyTagName = "rsaPubkey";
+        bytes memory rsaPubKeyType = bytes.concat(ABI.bytesT());
+        vm.prank(_operator);
+        terminusDIDProxy.defineTag(emptyDomain, rsaPubKeyTagName, rsaPubKeyType, fieldNames);
+
+        // define bytes4 tag type
+        string memory dnsARecordTagName = "dnsARecord";
+        bytes memory dnsARecordType = bytes.concat(ABI.bytesT(4));
+        vm.prank(_operator);
+        terminusDIDProxy.defineTag(emptyDomain, dnsARecordTagName, dnsARecordType, fieldNames);
+
+        // define tagger for emptyDomain and the above 3 tags
+        address tagger = address(100);
+        vm.prank(_operator);
+        terminusDIDProxy.setTagger(emptyDomain, authAddressesTagName, tagger);
+        vm.prank(_operator);
+        terminusDIDProxy.setTagger(emptyDomain, rsaPubKeyTagName, tagger);
+        vm.prank(_operator);
+        terminusDIDProxy.setTagger(emptyDomain, dnsARecordTagName, tagger);
+
+        // register a domain
+        string memory domain = "domain";
+        address owner = address(200);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, "did", "", true));
+
+        // add official tag for domain
+        bytes memory data;
+        address[] memory authAddresses = new address[](5);
+        authAddresses[0] = address(300);
+        authAddresses[1] = address(400);
+        authAddresses[2] = address(500);
+        authAddresses[3] = address(600);
+        authAddresses[4] = address(700);
+        data = abi.encode(authAddresses);
+        vm.prank(tagger);
+        terminusDIDProxy.addTag(emptyDomain, domain, authAddressesTagName, data);
+
+        bytes memory rsaPubKey =
+            hex"3182010a0282010100cce13bf3a77cbf0c407d734d3e646e24e4a7ed3a6013a191c4c58c2d3fa39864f34e4d3880a4c442905cfcc0570016f36a23e40b2372a95449203d5667170b78d5fba9dbdf0d045970dfed75764d9107e2ec3b09ff2087996c84e1d7aafb2e15dcce57ee9a5deb067ba65b50a382176ff34c9b0722aaff90e5e4ff7b915c89134e8d43555638e809d12d9795eebf36c39f7b57a400564250f60d969440f540ea34d25fc7cbbd8000731f5247ab3a408e7864b0b1afce5eb9d337601c0df36a1832b10374bca8a0325e2b56dca4f179c545002fa1d25b7fde737b48fdd3187b713e1b1f0cec601db09840b28cb56051945892e9141a0ba72900670cc8a587368f0203010001";
+        data = abi.encode(rsaPubKey);
+        vm.prank(tagger);
+        terminusDIDProxy.addTag(emptyDomain, domain, rsaPubKeyTagName, data);
+
+        bytes4 ipV4Address = bytes4(hex"ffffffff");
+        data = abi.encode(ipV4Address);
+        vm.prank(tagger);
+        terminusDIDProxy.addTag(emptyDomain, domain, dnsARecordTagName, data);
+
+        uint256 tagCount = terminusDIDProxy.getTagCount(emptyDomain, domain);
+        assertEq(tagCount, 3);
+
+        uint256[] memory elemPath;
+        for (uint256 i = 0; i < tagCount; i++) {
+            string memory tagName = terminusDIDProxy.getTagNameByIndex(emptyDomain, domain, i);
+            if (i == 0) {
+                assertEq(tagName, authAddressesTagName);
+                bytes memory gotData = terminusDIDProxy.getTagElem(emptyDomain, domain, tagName, elemPath);
+                address[] memory gotAuthAddresses = abi.decode(gotData, (address[]));
+                assertEq(gotAuthAddresses.length, 5);
+                assertEq(gotAuthAddresses[0], address(300));
+                assertEq(gotAuthAddresses[1], address(400));
+                assertEq(gotAuthAddresses[2], address(500));
+                assertEq(gotAuthAddresses[3], address(600));
+                assertEq(gotAuthAddresses[4], address(700));
+            } else if (i == 1) {
+                assertEq(tagName, rsaPubKeyTagName);
+                bytes memory gotData = terminusDIDProxy.getTagElem(emptyDomain, domain, tagName, elemPath);
+                bytes memory gotRsaPubKey = abi.decode(gotData, (bytes));
+                assertEq0(gotRsaPubKey, rsaPubKey);
+            } else if (i == 2) {
+                assertEq(tagName, dnsARecordTagName);
+                bytes memory gotData = terminusDIDProxy.getTagElem(emptyDomain, domain, tagName, elemPath);
+                bytes4 gotIpV4Address = abi.decode(gotData, (bytes4));
+                assertEq(gotIpV4Address, ipV4Address);
+            }
+        }
+    }
+
+    struct A {
+        B i;
+        C j;
+    }
+
+    struct B {
+        D i;
+    }
+
+    struct C {
+        bool i;
+    }
+
+    struct D {
+        E i;
+        F j;
+    }
+
+    struct E {
+        string i;
+        string j;
+    }
+
+    struct F {
+        uint256 i;
+        uint256 j;
+    }
+
+    function testFuzzNestedStructTag(A calldata a) public {
+        string memory emptyDomain = "";
+        string memory tagName = "nestedAttr";
+
+        // define types
+        bytes memory fType = ABI.tupleT(bytes.concat(ABI.uintT(256), ABI.uintT(256)));
+        bytes memory eType = ABI.tupleT(bytes.concat(ABI.stringT(), ABI.stringT()));
+        bytes memory dType = ABI.tupleT(bytes.concat(eType, fType));
+        bytes memory cType = ABI.tupleT(bytes.concat(ABI.boolT()));
+        bytes memory bType = ABI.tupleT(dType);
+        bytes memory aType = ABI.tupleT(bytes.concat(bType, cType));
+
+        // define filed names
+        string[][] memory fieldNames = new string[][](6);
+        fieldNames[0] = new string[](2);
+        fieldNames[0][0] = "i";
+        fieldNames[0][1] = "j";
+
+        fieldNames[1] = new string[](1);
+        fieldNames[1][0] = "i";
+
+        fieldNames[2] = new string[](2);
+        fieldNames[2][0] = "i";
+        fieldNames[2][1] = "j";
+
+        fieldNames[3] = new string[](2);
+        fieldNames[3][0] = "i";
+        fieldNames[3][1] = "j";
+
+        fieldNames[4] = new string[](2);
+        fieldNames[4][0] = "i";
+        fieldNames[4][1] = "j";
+
+        fieldNames[5] = new string[](1);
+        fieldNames[5][0] = "i";
+        
+        vm.recordLogs();
+
+        vm.prank(_operator);
+        terminusDIDProxy.defineTag(emptyDomain, tagName, aType, fieldNames);
+
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        assertEq(entries.length, 2);
+        assertEq(entries[0].topics[0], keccak256("OffchainStringArray(bytes32,string[])"));
+        assertEq(entries[0].topics[1], keccak256(abi.encode(fieldNames[0])));
+        assertEq(abi.decode(entries[0].data, (string[]))[0], "i");
+        assertEq(abi.decode(entries[0].data, (string[]))[1], "j");
+
+        assertEq(entries[1].topics[0], keccak256("OffchainStringArray(bytes32,string[])"));
+        assertEq(entries[1].topics[1], keccak256(abi.encode(fieldNames[1])));
+        assertEq(abi.decode(entries[1].data, (string[]))[0], "i");
+
+        // define tagger
+        address tagger = address(100);
+        vm.prank(_operator);
+        terminusDIDProxy.setTagger(emptyDomain, tagName, tagger);
+
+        // register a domain
+        string memory domain = "domain";
+        address owner = address(200);
+        vm.prank(_operator);
+        terminusDIDProxy.register(owner, TerminusDID.Metadata(domain, "did", "", true));
+
+        // add tag for domain
+        bytes memory data = abi.encode(a);
+        vm.prank(tagger);
+        terminusDIDProxy.addTag(emptyDomain, domain, tagName, data);
+
+        // check filed names hash
+        for (uint i = 0; i < 6; i++) {
+            bytes32 fieldNamesHash = terminusDIDProxy.getTagFieldNamesHashByIndex(emptyDomain, tagName, i);
+            if (i == 0 || i == 2 || i == 3 || i == 4) {
+                assertEq(fieldNamesHash, entries[0].topics[1]);
+            } else if (i == 1 || i == 5) {
+                assertEq(fieldNamesHash, entries[1].topics[1]);
+            }
+            uint256 blockNum = terminusDIDProxy.getFieldNamesEventBlock(fieldNamesHash);
+            assertEq(blockNum, block.number);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
