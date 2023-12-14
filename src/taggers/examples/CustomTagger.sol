@@ -2,55 +2,63 @@
 pragma solidity 0.8.21;
 
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
-// import {IResolver} from "../IResolver.sol";
-// import {ITerminusDID, IRegistrar} from "../../utils/Interfaces.sol";
+import {TerminusDID} from "../../core/TerminusDID.sol";
 
 contract CustomTagger is Context {
-    // uint256 private constant _STAFF_ID = 0xffff01;
+    TerminusDID private _terminusDID;
+    string private _typeDefineDomain;
 
-    // IRegistrar private _registrar;
-    // ITerminusDID private _registry;
+    string private _staffIDTagName = "staffID";
 
-    // error Unauthorized();
+    error Unauthorized();
+    error TagNoExists(string domain, string tagName);
 
-    // constructor(address registrar_, address registry_) {
-    //     _registrar = IRegistrar(registrar_);
-    //     _registry = ITerminusDID(registry_);
-    // }
+    constructor(address terminusDID_, string memory domain) {
+        _terminusDID = TerminusDID(terminusDID_);
+        _typeDefineDomain = domain;
+    }
 
-    // function tagGetter(uint256 key) public pure returns (bytes4) {
-    //     if (key == _STAFF_ID) {
-    //         return this.staffId.selector;
-    //     }
-    //     return 0;
-    // }
+    function terminusDID() external view returns (address) {
+        return address(_terminusDID);
+    }
 
-    // function getRegistrar() external view returns (address) {
-    //     return address(_registrar);
-    // }
+    function typeDefineDomain() external view returns (string memory) {
+        return _typeDefineDomain;
+    }
 
-    // function getRegistry() external view returns (address) {
-    //     return address(_registry);
-    // }
+    function setStaffId(string calldata domain, uint32 id) external {
+        address caller = _msgSender();
+        (, uint256 ownedLevel,) = _terminusDID.traceOwner(domain, caller);
+        if (ownedLevel == 0) {
+            revert Unauthorized();
+        }
 
-    // function setStaffId(string calldata domain, uint32 id) external {
-    //     address caller = _msgSender();
-    //     (, uint256 ownedLevel,) = _registrar.traceOwner(domain, caller);
-    //     if (ownedLevel == 0) {
-    //         revert Unauthorized();
-    //     }
+        bool hasTag = _terminusDID.hasTag(_typeDefineDomain, domain, _staffIDTagName);
 
-    //     if (id == 0) {
-    //         _registrar.setTag(domain, _STAFF_ID, "");
-    //     } else {
-    //         _registrar.setTag(domain, _STAFF_ID, bytes.concat(bytes4(id)));
-    //     }
-    // }
+        // remove tag
+        if (id == 0) {
+            if (!hasTag) {
+                revert TagNoExists(domain, _staffIDTagName);
+            }
+            return _terminusDID.removeTag(_typeDefineDomain, domain, _staffIDTagName);
+        }
 
-    // function staffId(uint256 tokenId) external view returns (uint32 id) {
-    //     (bool exists, bytes memory value) = _registry.getTagValue(tokenId, _STAFF_ID);
-    //     if (exists) {
-    //         id = uint32(bytes4(value));
-    //     }
-    // }
+        // update
+        if (hasTag) {
+            uint256[] memory elemPath;
+            _terminusDID.updateTagElem(_typeDefineDomain, domain, _staffIDTagName, elemPath, abi.encode(id));
+        } else {
+            // add rsaPubKey
+            _terminusDID.addTag(_typeDefineDomain, domain, _staffIDTagName, abi.encode(id));
+        }
+    }
+
+    function getStaffId(string calldata domain) external view returns (uint32 id) {
+        if (!_terminusDID.hasTag(_typeDefineDomain, domain, _staffIDTagName)) {
+            revert TagNoExists(domain, _staffIDTagName);
+        }
+        uint256[] memory elemPath;
+        bytes memory gotData = _terminusDID.getTagElem(_typeDefineDomain, domain, _staffIDTagName, elemPath);
+        return abi.decode(gotData, (uint32));
+    }
 }

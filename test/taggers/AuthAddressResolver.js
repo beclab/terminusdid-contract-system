@@ -14,16 +14,11 @@ const Action = {
     Add: 0,
     Remove: 1,
 }
-const _AUTH_ADDRESSES = 0x14;
 
 describe('Auth address test', function () {
     async function deployTokenFixture() {
         const [deployer, ...signers] = await getSigners();
         const operator = deployer;
-
-        let Registrar = await getContractFactory('Registrar');
-        let registrar = await Registrar.deploy(AddressZero, AddressZero, operator.address);
-        await registrar.deployed();
 
         let TerminusDID = await getContractFactory('TerminusDID');
         const name = "TerminusDID";
@@ -32,27 +27,34 @@ describe('Auth address test', function () {
         let terminusDIDProxy = await upgrades.deployProxy(TerminusDID, [name, symbol], { initializer: 'initialize', kind: 'uups', constructorArgs: [], unsafeAllow: ['state-variable-immutable'] })
         await terminusDIDProxy.deployed();
 
-        await terminusDIDProxy.setRegistrar(registrar.address);
+        await terminusDIDProxy.setOperator(operator.address);
 
-        const RootResolver = await getContractFactory('RootResolver');
-        const rootResolver = await RootResolver.deploy(registrar.address, terminusDIDProxy.address, operator.address);
-        await rootResolver.deployed();
+        const RootTagger = await getContractFactory('RootTagger');
+        const rootTagger = await RootTagger.deploy(terminusDIDProxy.address, operator.address);
+        await rootTagger.deployed();
 
-        await registrar.setRegistry(terminusDIDProxy.address);
-        await registrar.setRootResolver(rootResolver.address);
+        const authAddressesTagName = "authAddresses";
+        // AuthAddress[] type bytes: 0x04060002010107
+        const authAddressesType = utils.arrayify("0x04060002010107");
+        const rootDomain = "";
+        const fieldNames = new Array();
+        fieldNames.push(["algorithm", "addr"]);
+        await terminusDIDProxy.connect(operator).defineTag(rootDomain, authAddressesTagName, authAddressesType, fieldNames);
+        await terminusDIDProxy.connect(operator).setTagger(rootDomain, authAddressesTagName, rootTagger.address);
 
-        return { rootResolver, registrar, terminusDIDProxy, operator, signers };
+
+        return { rootTagger, terminusDIDProxy, operator, signers };
     }
 
 
     it('set auth address', async function () {
-        const { rootResolver, registrar, operator, signers } = await loadFixture(deployTokenFixture);
+        const { rootTagger, terminusDIDProxy, operator, signers } = await loadFixture(deployTokenFixture);
         const domainOwner = signers[0];
         const authAddr = signers[1];
-        await registrar.connect(operator).register(domainOwner.address, { domain: "a", did: "did", notes: "", allowSubdomain: true })
+        await terminusDIDProxy.connect(operator).register(domainOwner.address, { domain: "a", did: "did", notes: "", allowSubdomain: true })
 
         // All properties on a domain are optional
-        const domain = await getDomain(domainOwner, rootResolver.address);
+        const domain = await getDomain(domainOwner, rootTagger.address);
 
         // The named list of all type definitions
         const types = getTypes();
@@ -62,27 +64,27 @@ describe('Auth address test', function () {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            signAt: curTsInSeconds(),
+            signAt: curTsInSeconds() - 30 * 60,
             action: Action.Add
         };
 
         const sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
         const sigFromAuthAddr = await authAddr._signTypedData(domain, types, value);
 
-        await rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner);
+        await rootTagger.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner);
 
-        const ret = await rootResolver.connect(operator).authenticationAddress(tokenId(value.domain));
+        const ret = await rootTagger.connect(operator).getAuthenticationAddresses(value.domain);
         expect(ret.length).to.equal(1);
         expect(ret[0].algorithm).to.equal(value.algorithm);
         expect(ret[0].addr).to.equal(value.addr);
     });
 
     it('set mutiple auth addresses and remove test', async function () {
-        const { rootResolver, registrar, terminusDIDProxy, operator, signers } = await loadFixture(deployTokenFixture);
+        const { rootTagger, terminusDIDProxy, operator, signers } = await loadFixture(deployTokenFixture);
         const domainOwner = signers[0];
-        await registrar.connect(operator).register(domainOwner.address, { domain: "a", did: "did", notes: "", allowSubdomain: true })
+        await terminusDIDProxy.connect(operator).register(domainOwner.address, { domain: "a", did: "did", notes: "", allowSubdomain: true })
 
-        const domain = await getDomain(domainOwner, rootResolver.address);
+        const domain = await getDomain(domainOwner, rootTagger.address);
         const types = getTypes();
 
         for (let i = 0; i < 5; i++) {
@@ -91,17 +93,17 @@ describe('Auth address test', function () {
                 addr: authAddr.address,
                 algorithm: SignatureAlogorithm.ECDSA,
                 domain: "a",
-                signAt: curTsInSeconds(),
+                signAt: curTsInSeconds() - 30 * 60,
                 action: Action.Add
             };
 
             const sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
             const sigFromAuthAddress = await authAddr._signTypedData(domain, types, value);
 
-            await rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddress, sigFromDomainOwner);
+            await rootTagger.connect(operator).addAuthenticationAddress(value, sigFromAuthAddress, sigFromDomainOwner);
         }
 
-        let rets = await rootResolver.connect(operator).authenticationAddress(tokenId("a"));
+        let rets = await rootTagger.getAuthenticationAddresses("a");
         expect(rets.length).to.equal(5);
         for (let i = 0; i < 5; i++) {
             expect(rets[i].algorithm).to.equal(SignatureAlogorithm.ECDSA);
@@ -109,54 +111,57 @@ describe('Auth address test', function () {
         }
 
         // rmeove the address in array middle with index 2
+        // [[signers[0], signers[1], signers[2], signers[3], signers[4]] => [[signers[0], signers[1], signers[4], signers[3]]
         let removeAddr = signers[2];
         let removeValue = {
             addr: removeAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            signAt: curTsInSeconds(),
+            signAt: curTsInSeconds() - 30 * 60,
             action: Action.Remove
         }
         removeSigFromDomainOwner = await domainOwner._signTypedData(domain, types, removeValue);
-        await rootResolver.connect(operator).removeAuthenticationAddress(removeValue, removeSigFromDomainOwner);
+        await rootTagger.connect(operator).removeAuthenticationAddress(removeValue, removeSigFromDomainOwner, 2);
 
-        rets = await rootResolver.connect(operator).authenticationAddress(tokenId("a"));
+        rets = await rootTagger.getAuthenticationAddresses("a");
         expect(rets.length).to.equal(4);
         for (let i = 0; i < 4; i++) {
             expect(rets[i].addr).to.not.equal(removeAddr.address);
         }
 
         // rmeove the address in array start with index 0
+        // [[signers[0], signers[1], signers[4], signers[3]] => [[signers[3], signers[1], signers[4]]
         removeAddr = signers[0];
         removeValue = {
             addr: removeAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            signAt: curTsInSeconds(),
+            signAt: curTsInSeconds() - 30 * 60,
             action: Action.Remove
         }
         removeSigFromDomainOwner = await domainOwner._signTypedData(domain, types, removeValue);
-        await rootResolver.connect(operator).removeAuthenticationAddress(removeValue, removeSigFromDomainOwner);
+        await rootTagger.connect(operator).removeAuthenticationAddress(removeValue, removeSigFromDomainOwner, 0);
 
-        rets = await rootResolver.connect(operator).authenticationAddress(tokenId("a"));
+        rets = await rootTagger.getAuthenticationAddresses("a");
         expect(rets.length).to.equal(3);
         for (let i = 0; i < 3; i++) {
             expect(rets[i].addr).to.not.equal(removeAddr.address);
         }
 
-        // rmeove the address in array end with index 4
+        // remove the address in array end with index 4
+        // [[signers[3], signers[1], signers[4]] => [[signers[3], signers[1]]
         removeAddr = signers[4];
         removeValue = {
             addr: removeAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            signAt: curTsInSeconds(),
+            signAt: curTsInSeconds() - 30 * 60,
             action: Action.Remove
         }
         removeSigFromDomainOwner = await domainOwner._signTypedData(domain, types, removeValue);
-        await rootResolver.connect(operator).removeAuthenticationAddress(removeValue, removeSigFromDomainOwner);
+        await rootTagger.connect(operator).removeAuthenticationAddress(removeValue, removeSigFromDomainOwner, 2);
 
-        rets = await rootResolver.connect(operator).authenticationAddress(tokenId("a"));
+        rets = await rootTagger.getAuthenticationAddresses("a");
         expect(rets.length).to.equal(2);
         for (let i = 0; i < 2; i++) {
             expect(rets[i].addr).to.not.equal(removeAddr.address);
@@ -168,55 +173,52 @@ describe('Auth address test', function () {
         }
 
         // remove all addresses
+        // [[signers[3], signers[1]] -> [[signers[3]]
         removeAddr = signers[1];
         removeValue = {
             addr: removeAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            signAt: curTsInSeconds(),
+            signAt: curTsInSeconds() - 30 * 60,
             action: Action.Remove
         }
         removeSigFromDomainOwner = await domainOwner._signTypedData(domain, types, removeValue);
-        await rootResolver.connect(operator).removeAuthenticationAddress(removeValue, removeSigFromDomainOwner);
+        await rootTagger.connect(operator).removeAuthenticationAddress(removeValue, removeSigFromDomainOwner, 1);
 
+        // [[signers[3]] -> null
         removeAddr = signers[3];
         removeValue = {
             addr: removeAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            signAt: curTsInSeconds(),
+            signAt: curTsInSeconds() - 30 * 60,
             action: Action.Remove
         }
         removeSigFromDomainOwner = await domainOwner._signTypedData(domain, types, removeValue);
-        await rootResolver.connect(operator).removeAuthenticationAddress(removeValue, removeSigFromDomainOwner);
+        await rootTagger.connect(operator).removeAuthenticationAddress(removeValue, removeSigFromDomainOwner, 0);
 
-        let ret = await terminusDIDProxy.getTagValue(tokenId("a"), _AUTH_ADDRESSES);
-        expect(ret.exists).to.be.false;
+        const rootDomain = "";
+        const authAddressesTagName = "authAddresses";
+        let ret = await terminusDIDProxy.hasTag(rootDomain, "a", authAddressesTagName);
+        expect(ret).to.be.false;
 
-        rets = await rootResolver.connect(operator).authenticationAddress(tokenId("a"));
-        expect(rets.length).to.equal(0);
-    });
-
-    it('tagGetter for key _AUTH_ADDRESSES', async function () {
-        const { rootResolver } = await loadFixture(deployTokenFixture);
-        const selector = await rootResolver.tagGetter(_AUTH_ADDRESSES);
-        expect(selector).to.equal(id('authenticationAddress(uint256)').substring(0, 10));
+        await expect(rootTagger.connect(operator).getAuthenticationAddresses("a")).to.be.revertedWithCustomError(rootTagger, "RootTagNoExists");
     });
 
     it('error cases', async function () {
-        const { rootResolver, registrar, operator, signers } = await loadFixture(deployTokenFixture);
+        const { rootTagger, terminusDIDProxy, operator, signers } = await loadFixture(deployTokenFixture);
         const domainOwner = signers[0];
         const authAddr = signers[1];
-        await registrar.connect(operator).register(domainOwner.address, { domain: "a", did: "did", notes: "", allowSubdomain: true })
+        await terminusDIDProxy.connect(operator).register(domainOwner.address, { domain: "a", did: "did", notes: "", allowSubdomain: true })
 
-        const domain = await getDomain(domainOwner, rootResolver.address);
+        const domain = await getDomain(domainOwner, rootTagger.address);
         const types = getTypes();
 
         let value = {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.Others,
             domain: "a",
-            signAt: curTsInSeconds(),
+            signAt: curTsInSeconds() - 30 * 60,
             action: Action.Add
         };
 
@@ -224,7 +226,7 @@ describe('Auth address test', function () {
         let sigFromAuthAddr = await authAddr._signTypedData(domain, types, value);
 
         // cannot catch UnsupportedSigAlgorithm error as it will fail at function signature check, the algorithm can only be 0 in contract.
-        await expect(rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.reverted;
+        await expect(rootTagger.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.reverted;
 
         // signature expired
         value = {
@@ -237,7 +239,7 @@ describe('Auth address test', function () {
 
         sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
         sigFromAuthAddr = await authAddr._signTypedData(domain, types, value);
-        await expect(rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "SignatureIsValidOnlyInOneHour");
+        await expect(rootTagger.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootTagger, "SignatureIsValidOnlyInOneHour");
 
         value = {
             addr: authAddr.address,
@@ -249,130 +251,141 @@ describe('Auth address test', function () {
 
         sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
         sigFromAuthAddr = await authAddr._signTypedData(domain, types, value);
-        await expect(rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "SignatureIsValidOnlyInOneHour");
+        await expect(rootTagger.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootTagger, "SignatureIsValidOnlyInOneHour");
 
         // Unauthorized
         value = {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            signAt: curTsInSeconds(),
+            signAt: curTsInSeconds() - 30 * 60,
             action: Action.Add
         };
 
         const notOWner = signers[2];
         sigFromDomainOwner = await notOWner._signTypedData(domain, types, value);
         sigFromAuthAddr = await authAddr._signTypedData(domain, types, value);
-        await expect(rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "Unauthorized");
+        await expect(rootTagger.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootTagger, "Unauthorized");
 
         // InvalidAddressSignature
         value = {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            signAt: curTsInSeconds(),
+            signAt: curTsInSeconds() - 30 * 60,
             action: Action.Add
         };
 
         const notAuthAddress = signers[3];
         sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
         sigFromAuthAddr = await notAuthAddress._signTypedData(domain, types, value);
-        await expect(rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "InvalidAddressSignature");
+        await expect(rootTagger.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootTagger, "InvalidAddressSignature");
 
         // invalid signature length
         value = {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            signAt: curTsInSeconds(),
+            signAt: curTsInSeconds() - 30 * 60,
             action: Action.Add
         };
 
         sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
         sigFromAuthAddr = await authAddr._signTypedData(domain, types, value);
-        await expect(rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr + "abcd", sigFromDomainOwner)).to.be.revertedWith("invalid signature length");
+        await expect(rootTagger.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr + "abcd", sigFromDomainOwner)).to.be.revertedWith("invalid signature length");
 
-        // AuthAddressNotExists
+        // RootTagNoExists
         value = {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            signAt: curTsInSeconds(),
+            signAt: curTsInSeconds() - 30 * 60,
             action: Action.Remove
         };
         sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
-        await expect(rootResolver.removeAuthenticationAddress(value, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "AuthAddressNotExists");
+        await expect(rootTagger.removeAuthenticationAddress(value, sigFromDomainOwner, 0)).to.be.revertedWithCustomError(rootTagger, "RootTagNoExists");
 
-        // AddressNotFound
+        // InvalidIndex
         for (let i = 4; i < 10; i++) {
             const authAddr = signers[i];
             const value = {
                 addr: authAddr.address,
                 algorithm: SignatureAlogorithm.ECDSA,
                 domain: "a",
-                signAt: curTsInSeconds(),
+                signAt: curTsInSeconds() - 30 * 60,
                 action: Action.Add
             };
 
             const sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
             const sigFromAuthAddress = await authAddr._signTypedData(domain, types, value);
 
-            await rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddress, sigFromDomainOwner);
+            await rootTagger.connect(operator).addAuthenticationAddress(value, sigFromAuthAddress, sigFromDomainOwner);
         }
         const removeAddr = signers[10];
         value = {
             addr: removeAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            signAt: curTsInSeconds(),
+            signAt: curTsInSeconds() - 30 * 60,
             action: Action.Remove
         };
         sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
-        await expect(rootResolver.removeAuthenticationAddress(value, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "AddressNotFound");
+        await expect(rootTagger.removeAuthenticationAddress(value, sigFromDomainOwner, 6)).to.be.revertedWithCustomError(rootTagger, "InvalidIndex");
 
-        // AuthAddressAlreadyExists
+        const removeAddr1 = signers[0];
+        value = {
+            addr: removeAddr1.address,
+            algorithm: SignatureAlogorithm.ECDSA,
+            domain: "a",
+            signAt: curTsInSeconds() - 30 * 60,
+            action: Action.Remove
+        };
+        sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
+        await expect(rootTagger.removeAuthenticationAddress(value, sigFromDomainOwner, 0)).to.be.revertedWithCustomError(rootTagger, "InvalidIndex");
+
+
+        // can add duplicate address
         value = {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            signAt: curTsInSeconds(),
+            signAt: curTsInSeconds() - 30 * 60,
             action: Action.Add
         };
 
         sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
         sigFromAuthAddr = await authAddr._signTypedData(domain, types, value);
-        await rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner);
-        await expect(rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "AuthAddressAlreadyExists");
+        await rootTagger.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner);
+        await rootTagger.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner);
+        const rets = await rootTagger.getAuthenticationAddresses("a");
+        expect(rets.length).to.equal(8);
+        expect(rets[6].addr).to.equal(rets[7].addr);
 
         // Invalid action
         value = {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            signAt: curTsInSeconds(),
+            signAt: curTsInSeconds() - 30 * 60,
             action: Action.Remove
         };
 
         sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
         sigFromAuthAddr = await authAddr._signTypedData(domain, types, value);
-        await expect(rootResolver.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "InvalidAction");
+        await expect(rootTagger.connect(operator).addAuthenticationAddress(value, sigFromAuthAddr, sigFromDomainOwner)).to.be.revertedWithCustomError(rootTagger, "InvalidAction");
 
         value = {
             addr: authAddr.address,
             algorithm: SignatureAlogorithm.ECDSA,
             domain: "a",
-            signAt: curTsInSeconds(),
+            signAt: curTsInSeconds() - 30 * 60,
             action: Action.Add
         };
 
         sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
-        await expect(rootResolver.connect(operator).removeAuthenticationAddress(value, sigFromDomainOwner)).to.be.revertedWithCustomError(rootResolver, "InvalidAction");
+        await expect(rootTagger.connect(operator).removeAuthenticationAddress(value, sigFromDomainOwner, 0)).to.be.revertedWithCustomError(rootTagger, "InvalidAction");
     });
 });
-
-function tokenId(domain) {
-    return BigNumber.from(id(domain));
-}
 
 function curTsInSeconds() {
     return Math.floor(Date.now() / 1000);

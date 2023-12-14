@@ -4,7 +4,6 @@ require("hardhat-preprocessor");
 require("dotenv").config();
 const fs = require("fs")
 
-const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 
 function getRemappings() {
@@ -25,11 +24,15 @@ module.exports = {
                         enabled: true,
                         runs: 200,
                     },
+                    viaIR: true,
                 },
             }
         ],
     },
     networks: {
+        hardhat: {
+            allowUnlimitedContractSize: true,
+        },
         goerli: {
             url: `https://ethereum-goerli.publicnode.com`,
             gas: 15000000,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.21;
 
-import {Test, console, Vm} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
@@ -423,8 +423,7 @@ contract TerminusDIDTest is Test {
         // define official tag: domain should be empty, only by operator
         vm.prank(_operator);
         terminusDIDProxy.defineTag(rootDomain, tagName, addressArrayType, fieldNames);
-        (bytes memory gotAbiType, bytes32[] memory gotFieldNamesHash) =
-            terminusDIDProxy.getTagType(rootDomain, tagName);
+        (bytes memory gotAbiType, bytes32[] memory gotFieldNamesHash) = terminusDIDProxy.getTagType(rootDomain, tagName);
         assertEq0(addressArrayType, gotAbiType);
         assertEq(gotFieldNamesHash.length, 0);
 
@@ -963,7 +962,7 @@ contract TerminusDIDTest is Test {
 
         fieldNames[5] = new string[](1);
         fieldNames[5][0] = "i";
-        
+
         vm.recordLogs();
 
         vm.prank(_operator);
@@ -997,7 +996,7 @@ contract TerminusDIDTest is Test {
         terminusDIDProxy.addTag(rootDomain, domain, tagName, data);
 
         // check filed names hash
-        for (uint i = 0; i < 6; i++) {
+        for (uint256 i = 0; i < 6; i++) {
             bytes32 fieldNamesHash = terminusDIDProxy.getTagFieldNamesHashByIndex(rootDomain, tagName, i);
             if (i == 0 || i == 2 || i == 3 || i == 4) {
                 assertEq(fieldNamesHash, entries[0].topics[1]);

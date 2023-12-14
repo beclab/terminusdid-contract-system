@@ -2,257 +2,326 @@
 pragma solidity 0.8.21;
 
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
-// import {BytesUtils} from "ens-contracts/dnssec-oracle/BytesUtils.sol";
-// import {Asn1Decode} from "../utils/Asn1Decode.sol";
+import {BytesUtils} from "ens-contracts/dnssec-oracle/BytesUtils.sol";
+import {Asn1Decode} from "../utils/Asn1Decode.sol";
 import {SignatureHelper} from "../utils/SignatureHelper.sol";
-// import {DomainUtils} from "../utils/DomainUtils.sol";
-// import {TerminusDID} from "../core/TerminusDID.sol";
+import {DomainUtils} from "../utils/DomainUtils.sol";
+import {TerminusDID} from "../core/TerminusDID.sol";
 
 contract RootTagger is SignatureHelper, Context {
-    // using Asn1Decode for bytes;
-    // using BytesUtils for bytes;
-    // using DomainUtils for string;
+    using Asn1Decode for bytes;
+    using BytesUtils for bytes;
+    using DomainUtils for string;
 
-    // // http://oid-info.com/get/1.2.840.113549.1.1.1
-    // bytes private constant _OID_PKCS = hex"2a864886f70d010101";
+    // http://oid-info.com/get/1.2.840.113549.1.1.1
+    bytes private constant _OID_PKCS = hex"2a864886f70d010101";
 
-    // // signature is valid within 1 hour
-    // uint256 private constant VALID_SIG_INTERVAL = 60 * 60;
+    // signature is valid within 1 hour
+    uint256 private constant VALID_SIG_INTERVAL = 60 * 60;
 
-    // address private _operator;
-    // TerminusDID private _terminusDID;
+    TerminusDID private _terminusDID;
+    address private _operator;
 
-    // error Unauthorized();
-    // error UnsupportedSigAlgorithm();
-    // error SignatureIsValidOnlyInOneHour(uint256 signAt, uint256 blockchainCurTimeStamp);
-    // error InvalidAddressSignature(address addr, bytes signature);
-    // error AddressNotFound(address addr);
-    // error AuthAddressNotExists();
-    // error AuthAddressAlreadyExists();
-    // error InvalidAction();
+    string private _rootDomain = "";
+    string private _rsaPubKeyTagName = "rsaPubKey";
+    string private _dnsARecordTagName = "dnsARecord";
+    string private _authAddressesTagName = "authAddresses";
+    string private _latestDIDTagName = "latestDID";
 
-    // struct AuthAddress {
-    //     SigAlg algorithm;
-    //     address addr;
-    // }
+    error Unauthorized();
+    error RootTagNoExists(string domain, string tagName);
+    error UnsupportedSigAlgorithm();
+    error InvalidAction();
+    error SignatureIsValidOnlyInOneHour(uint256 signAt, uint256 blockchainCurTimeStamp);
+    error InvalidAddressSignature(address addr, bytes signature);
+    error InvalidIndex();
 
-    // modifier authorizationCheck(string calldata domain) {
-    //     address caller = _msgSender();
-    //     if (caller != _operator) {
-    //         (, uint256 ownedLevel,) = _terminusDID.traceOwner(domain, caller);
-    //         if (ownedLevel == 0) {
-    //             revert Unauthorized();
-    //         }
-    //     }
-    //     _;
-    // }
+    struct AuthAddress {
+        SigAlg algorithm;
+        address addr;
+    }
 
-    // constructor(address terminusDID_, address operator_) {
-    //     _terminusDID = TerminusDID(terminusDID_);
-    //     _operator = operator_;
-    // }
+    modifier authorizationCheck(string calldata domain) {
+        address caller = _msgSender();
+        if (caller != _operator) {
+            (, uint256 ownedLevel,) = _terminusDID.traceOwner(domain, caller);
+            if (ownedLevel == 0) {
+                revert Unauthorized();
+            }
+        }
+        _;
+    }
 
-    // function terminusDID() external view returns (address) {
-    //     return address(_terminusDID);
-    // }
+    constructor(address terminusDID_, address operator_) {
+        _terminusDID = TerminusDID(terminusDID_);
+        _operator = operator_;
+    }
 
-    // function operator() external view returns (address) {
-    //     return _operator;
-    // }
+    function terminusDID() external view returns (address) {
+        return address(_terminusDID);
+    }
 
-    // /*
-    // RSAPublicKey support RSA Pkcs8 ASN.1 format:
-    // EncryptedPrivateKeyInfo SEQUENE
-    //     encryptionAlgorithm SEQUENCE
-    //         algorithm OBJECT IDENTIFIER
-    //         parameters
-    //     encryptedData BIT STRING
-    //         SEQUENCE
-    //             INTEGER -- modulus
-    //             INTEGER -- exponent
-    // */
-    // function setRsaPubKey(string calldata domain, bytes calldata pubKey) external authorizationCheck(domain) {
-    //     if (pubKey.length == 0) {
-    //         _registrar.setTag(domain, _RSA_PUBKEY, "");
-    //     } else {
-    //         uint256 encryptedPrivateKeyInfoRange = pubKey.rootOfSequenceStringAt(0);
-    //         bytes memory encryptedPrivateKeyInfo = pubKey.bytesAt(encryptedPrivateKeyInfoRange);
+    function operator() external view returns (address) {
+        return _operator;
+    }
 
-    //         uint256 encryptionAlgorithmRange = encryptedPrivateKeyInfo.rootOfSequenceStringAt(0);
-    //         {
-    //             bytes memory encryptionAlgorithm = encryptedPrivateKeyInfo.bytesAt(encryptionAlgorithmRange);
+    /*
+    RSAPublicKey support RSA Pkcs8 ASN.1 format:
+    EncryptedPrivateKeyInfo SEQUENE
+        encryptionAlgorithm SEQUENCE
+            algorithm OBJECT IDENTIFIER
+            parameters
+        encryptedData BIT STRING
+            SEQUENCE
+                INTEGER -- modulus
+                INTEGER -- exponent
+    */
+    function setRsaPubKey(string calldata domain, bytes calldata pubKey) external authorizationCheck(domain) {
+        bool hasTag = _terminusDID.hasTag(_rootDomain, domain, _rsaPubKeyTagName);
 
-    //             uint256 algorithmRange = encryptionAlgorithm.rootOfObjectIdentifierAt(0);
-    //             bytes memory algorithm = encryptionAlgorithm.bytesAt(algorithmRange);
-    //             require(algorithm.equals(_OID_PKCS), "Rsa pub key parsing: not PKCS format");
-    //         }
+        // remove rsaPubKey
+        if (pubKey.length == 0) {
+            if (!hasTag) {
+                revert RootTagNoExists(domain, _rsaPubKeyTagName);
+            }
+            return _terminusDID.removeTag(_rootDomain, domain, _rsaPubKeyTagName);
+        }
 
-    //         {
-    //             uint256 encryptedDataRange = encryptedPrivateKeyInfo.nextSiblingOf(encryptionAlgorithmRange);
-    //             bytes memory encryptedData = encryptedPrivateKeyInfo.bitstringAt(encryptedDataRange);
+        _rsaPubKeyCheck(pubKey);
 
-    //             uint256 sequenceRange = encryptedData.rootOfSequenceStringAt(0);
-    //             bytes memory sequence = encryptedData.bytesAt(sequenceRange);
+        // update rsaPubKey
+        if (hasTag) {
+            uint256[] memory elemPath;
+            _terminusDID.updateTagElem(_rootDomain, domain, _rsaPubKeyTagName, elemPath, abi.encode(pubKey));
+        } else {
+            // add rsaPubKey
+            _terminusDID.addTag(_rootDomain, domain, _rsaPubKeyTagName, abi.encode(pubKey));
+        }
+    }
 
-    //             uint256 modulusRange = sequence.root();
-    //             sequence.uintBytesAt(modulusRange);
+    function getRsaPubKey(string calldata domain) external view returns (bytes memory) {
+        if (!_terminusDID.hasTag(_rootDomain, domain, _rsaPubKeyTagName)) {
+            revert RootTagNoExists(domain, _rsaPubKeyTagName);
+        }
+        uint256[] memory elemPath;
+        bytes memory gotData = _terminusDID.getTagElem(_rootDomain, domain, _rsaPubKeyTagName, elemPath);
+        return abi.decode(gotData, (bytes));
+    }
 
-    //             uint256 publicExponentRange = sequence.nextSiblingOf(modulusRange);
-    //             sequence.uintAt(publicExponentRange);
-    //         }
+    function _rsaPubKeyCheck(bytes calldata pubKey) internal pure {
+        uint256 encryptedPrivateKeyInfoRange = pubKey.rootOfSequenceStringAt(0);
+        bytes memory encryptedPrivateKeyInfo = pubKey.bytesAt(encryptedPrivateKeyInfoRange);
 
-    //         _registrar.setTag(domain, _RSA_PUBKEY, pubKey);
-    //     }
-    // }
+        uint256 encryptionAlgorithmRange = encryptedPrivateKeyInfo.rootOfSequenceStringAt(0);
+        {
+            bytes memory encryptionAlgorithm = encryptedPrivateKeyInfo.bytesAt(encryptionAlgorithmRange);
 
-    // function rsaPubKey(uint256 tokenId) external view returns (bytes memory pubKey) {
-    //     (, pubKey) = _registry.getTagValue(tokenId, _RSA_PUBKEY);
-    // }
+            uint256 algorithmRange = encryptionAlgorithm.rootOfObjectIdentifierAt(0);
+            bytes memory algorithm = encryptionAlgorithm.bytesAt(algorithmRange);
+            require(algorithm.equals(_OID_PKCS), "Rsa pub key parsing: not PKCS format");
+        }
 
-    // /*
-    // DNS A record can be represent by 4 bytes, in which each byte represents a number range from 0 to 255.
-    // The raw bytes data length must be 4.
-    // */
-    // function setDnsARecord(string calldata domain, bytes4 ipv4) external authorizationCheck(domain) {
-    //     if (ipv4 == bytes4(0)) {
-    //         _registrar.setTag(domain, _DNS_A_RECORD, "");
-    //     } else {
-    //         _registrar.setTag(domain, _DNS_A_RECORD, bytes.concat(ipv4));
-    //     }
-    // }
+        {
+            uint256 encryptedDataRange = encryptedPrivateKeyInfo.nextSiblingOf(encryptionAlgorithmRange);
+            bytes memory encryptedData = encryptedPrivateKeyInfo.bitstringAt(encryptedDataRange);
 
-    // function dnsARecord(uint256 tokenId) external view returns (bytes4 ipv4) {
-    //     (bool exists, bytes memory value) = _registry.getTagValue(tokenId, _DNS_A_RECORD);
-    //     if (exists) {
-    //         ipv4 = bytes4(value);
-    //     }
-    // }
+            uint256 sequenceRange = encryptedData.rootOfSequenceStringAt(0);
+            bytes memory sequence = encryptedData.bytesAt(sequenceRange);
 
-    // /*
-    // Authentication addresses are addresses that the domain owner owns its private key
-    // */
-    // function addAuthenticationAddress(
-    //     AuthAddressReq calldata authAddressReq,
-    //     bytes calldata sigFromAddressPrivKey,
-    //     bytes calldata sigFromDomainOwnerPrivKey
-    // ) external {
-    //     // only support ethereum signature algorithm ECDSA so far
-    //     if (authAddressReq.algorithm != SigAlg.ECDSA) {
-    //         revert UnsupportedSigAlgorithm();
-    //     }
+            uint256 modulusRange = sequence.root();
+            sequence.uintBytesAt(modulusRange);
 
-    //     // should be add action
-    //     if (authAddressReq.action != Action.Add) {
-    //         revert InvalidAction();
-    //     }
+            uint256 publicExponentRange = sequence.nextSiblingOf(modulusRange);
+            sequence.uintAt(publicExponentRange);
+        }
+    }
 
-    //     // signature expired
-    //     if (
-    //         !(block.timestamp >= authAddressReq.signAt && block.timestamp <= authAddressReq.signAt + VALID_SIG_INTERVAL)
-    //     ) {
-    //         revert SignatureIsValidOnlyInOneHour(authAddressReq.signAt, block.timestamp);
-    //     }
+    /*
+    DNS A record can be represent by 4 bytes, in which each byte represents a number range from 0 to 255.
+    The raw bytes data length must be 4.
+    */
+    function setDnsARecord(string calldata domain, bytes4 ipv4) external authorizationCheck(domain) {
+        bool hasTag = _terminusDID.hasTag(_rootDomain, domain, _dnsARecordTagName);
+        // remove dnsARecord
+        if (ipv4 == bytes4(0)) {
+            if (!hasTag) {
+                revert RootTagNoExists(domain, _dnsARecordTagName);
+            }
+            return _terminusDID.removeTag(_rootDomain, domain, _dnsARecordTagName);
+        }
 
-    //     // signature check for domain owner
-    //     address domainOwner = recoverSigner(authAddressReq, sigFromDomainOwnerPrivKey);
-    //     if (domainOwner != _registry.ownerOf(authAddressReq.domain.tokenId())) {
-    //         revert Unauthorized();
-    //     }
+        // update dnsARecord
+        if (hasTag) {
+            uint256[] memory elemPath;
+            _terminusDID.updateTagElem(_rootDomain, domain, _dnsARecordTagName, elemPath, abi.encode(ipv4));
+        } else {
+            // add dnsARecord
+            _terminusDID.addTag(_rootDomain, domain, _dnsARecordTagName, abi.encode(ipv4));
+        }
+    }
 
-    //     // signature check for auth address
-    //     if (authAddressReq.addr != recoverSigner(authAddressReq, sigFromAddressPrivKey)) {
-    //         revert InvalidAddressSignature(authAddressReq.addr, sigFromAddressPrivKey);
-    //     }
+    function getDnsARecord(string calldata domain) external view returns (bytes4) {
+        if (!_terminusDID.hasTag(_rootDomain, domain, _dnsARecordTagName)) {
+            revert RootTagNoExists(domain, _dnsARecordTagName);
+        }
+        uint256[] memory elemPath;
+        bytes memory gotData = _terminusDID.getTagElem(_rootDomain, domain, _dnsARecordTagName, elemPath);
+        return abi.decode(gotData, (bytes4));
+    }
 
-    //     // new add auth address
-    //     AuthAddress memory newAddAuthAddr = AuthAddress(authAddressReq.algorithm, authAddressReq.addr);
+    /*
+    Authentication addresses are addresses that the domain owner owns its private key
+    */
+    function addAuthenticationAddress(
+        AuthAddressReq calldata authAddressReq,
+        bytes calldata sigFromAddressPrivKey,
+        bytes calldata sigFromDomainOwnerPrivKey
+    ) external {
+        // check
+        _authAddressCommonCheck(authAddressReq, sigFromDomainOwnerPrivKey, Action.Add);
 
-    //     // auth addresses data structure: AuthAddress[]
-    //     // if not exists, set to registry, otherwise append to.
-    //     (bool exists, bytes memory value) = _registry.getTagValue(authAddressReq.domain.tokenId(), _AUTH_ADDRESSES);
-    //     if (!exists) {
-    //         AuthAddress[] memory addrs = new AuthAddress[](1);
-    //         addrs[0] = newAddAuthAddr;
-    //         _registrar.setTag(authAddressReq.domain, _AUTH_ADDRESSES, abi.encode(addrs));
-    //     } else {
-    //         AuthAddress[] memory curAddrs = abi.decode(value, (AuthAddress[]));
-    //         AuthAddress[] memory newAddrs = new AuthAddress[](curAddrs.length + 1);
-    //         for (uint256 i = 0; i < curAddrs.length; i++) {
-    //             if (curAddrs[i].algorithm == authAddressReq.algorithm && curAddrs[i].addr == authAddressReq.addr) {
-    //                 revert AuthAddressAlreadyExists();
-    //             }
-    //             newAddrs[i] = curAddrs[i];
-    //         }
-    //         newAddrs[curAddrs.length] = newAddAuthAddr;
-    //         _registrar.setTag(authAddressReq.domain, _AUTH_ADDRESSES, abi.encode(newAddrs));
-    //     }
-    // }
+        // signature check for auth address
+        if (authAddressReq.addr != recoverSigner(authAddressReq, sigFromAddressPrivKey)) {
+            revert InvalidAddressSignature(authAddressReq.addr, sigFromAddressPrivKey);
+        }
 
-    // function removeAuthenticationAddress(
-    //     AuthAddressReq calldata authAddressReq,
-    //     bytes calldata sigFromDomainOwnerPrivKey
-    // ) external {
-    //     // only support ethereum signature algorithm ECDSA so far
-    //     if (authAddressReq.algorithm != SigAlg.ECDSA) {
-    //         revert UnsupportedSigAlgorithm();
-    //     }
+        // new add auth address
+        AuthAddress memory newAddAuthAddr = AuthAddress(authAddressReq.algorithm, authAddressReq.addr);
 
-    //     // should be remove action
-    //     if (authAddressReq.action != Action.Remove) {
-    //         revert InvalidAction();
-    //     }
+        // auth addresses data structure: AuthAddress[]
+        // if no exists, addTag, otherwise append to.
+        bool hasTag = _terminusDID.hasTag(_rootDomain, authAddressReq.domain, _authAddressesTagName);
+        // append
+        if (hasTag) {
+            uint256[] memory elemPath;
+            _terminusDID.pushTagElem(
+                _rootDomain, authAddressReq.domain, _authAddressesTagName, elemPath, abi.encode(newAddAuthAddr)
+            );
+        } else {
+            // addTag
+            AuthAddress[] memory addrs = new AuthAddress[](1);
+            addrs[0] = newAddAuthAddr;
+            _terminusDID.addTag(_rootDomain, authAddressReq.domain, _authAddressesTagName, abi.encode(addrs));
+        }
+    }
 
-    //     // signature expired
-    //     if (
-    //         !(block.timestamp >= authAddressReq.signAt && block.timestamp <= authAddressReq.signAt + VALID_SIG_INTERVAL)
-    //     ) {
-    //         revert SignatureIsValidOnlyInOneHour(authAddressReq.signAt, block.timestamp);
-    //     }
-    //     // signature check for domain owner
-    //     address domainOwner = recoverSigner(authAddressReq, sigFromDomainOwnerPrivKey);
-    //     if (domainOwner != _registry.ownerOf(authAddressReq.domain.tokenId())) {
-    //         revert Unauthorized();
-    //     }
+    function removeAuthenticationAddress(
+        AuthAddressReq calldata authAddressReq,
+        bytes calldata sigFromDomainOwnerPrivKey,
+        uint256 index
+    ) external {
+        // check
+        _authAddressCommonCheck(authAddressReq, sigFromDomainOwnerPrivKey, Action.Remove);
 
-    //     (bool exists, bytes memory value) = _registry.getTagValue(authAddressReq.domain.tokenId(), _AUTH_ADDRESSES);
-    //     // no tag value at all
-    //     if (!exists) {
-    //         revert AuthAddressNotExists();
-    //     }
-    //     AuthAddress[] memory curAddrs = abi.decode(value, (AuthAddress[]));
-    //     bool found;
-    //     uint256 toDeleteIndex;
-    //     for (uint256 i = 0; i < curAddrs.length; i++) {
-    //         if (curAddrs[i].algorithm == authAddressReq.algorithm && curAddrs[i].addr == authAddressReq.addr) {
-    //             found = true;
-    //             toDeleteIndex = i;
-    //             break;
-    //         }
-    //     }
-    //     // no found address to be deleted
-    //     if (!found) {
-    //         revert AddressNotFound(authAddressReq.addr);
-    //     }
-    //     // found and tag value will be empty after delete the address, delete tag
-    //     if (found && curAddrs.length == 1) {
-    //         _registrar.setTag(authAddressReq.domain, _AUTH_ADDRESSES, "");
-    //         return;
-    //     }
-    //     // remove found address
-    //     AuthAddress[] memory newAddrs = new AuthAddress[](curAddrs.length - 1);
-    //     for (uint256 i = 0; i < toDeleteIndex; i++) {
-    //         newAddrs[i] = curAddrs[i];
-    //     }
-    //     for (uint256 i = toDeleteIndex + 1; i < curAddrs.length; i++) {
-    //         newAddrs[i - 1] = curAddrs[i];
-    //     }
-    //     _registrar.setTag(authAddressReq.domain, _AUTH_ADDRESSES, abi.encode(newAddrs));
-    // }
+        bool hasTag = _terminusDID.hasTag(_rootDomain, authAddressReq.domain, _authAddressesTagName);
+        // no tag value at all
+        if (!hasTag) {
+            revert RootTagNoExists(authAddressReq.domain, _authAddressesTagName);
+        }
 
-    // function authenticationAddress(uint256 tokenId) external view returns (AuthAddress[] memory addrs) {
-    //     (bool exists, bytes memory value) = _registry.getTagValue(tokenId, _AUTH_ADDRESSES);
-    //     if (exists) {
-    //         addrs = abi.decode(value, (AuthAddress[]));
-    //     }
-    // }
+        uint256[] memory elemPath;
+        uint256 len = _terminusDID.getTagElemLength(_rootDomain, authAddressReq.domain, _authAddressesTagName, elemPath);
+        if (index >= len) {
+            revert InvalidIndex();
+        }
+
+        // get the toDelete address, check whether it is the same with request address
+        uint256[] memory addressPath = new uint256[](1);
+        addressPath[0] = index;
+        bytes memory toDeleteAddressData =
+            _terminusDID.getTagElem(_rootDomain, authAddressReq.domain, _authAddressesTagName, addressPath);
+        AuthAddress memory toDeleteAddress = abi.decode(toDeleteAddressData, (AuthAddress));
+        if (!(toDeleteAddress.algorithm == authAddressReq.algorithm && toDeleteAddress.addr == authAddressReq.addr)) {
+            revert InvalidIndex();
+        }
+
+        // if the toDelete address is the only address then remove tag
+        if (len == 1) {
+            return _terminusDID.removeTag(_rootDomain, authAddressReq.domain, _authAddressesTagName);
+        }
+
+        // swap the last address with toDelete address and pop the authAddresses array
+        if (index == len - 1) {
+            _terminusDID.popTagElem(_rootDomain, authAddressReq.domain, _authAddressesTagName, elemPath);
+        } else {
+            addressPath[0] = len - 1;
+            bytes memory lastAuthAddressData =
+                _terminusDID.getTagElem(_rootDomain, authAddressReq.domain, _authAddressesTagName, addressPath);
+            addressPath[0] = index;
+            _terminusDID.updateTagElem(
+                _rootDomain, authAddressReq.domain, _authAddressesTagName, addressPath, lastAuthAddressData
+            );
+            _terminusDID.popTagElem(_rootDomain, authAddressReq.domain, _authAddressesTagName, elemPath);
+        }
+    }
+
+    function getAuthenticationAddresses(string calldata domain) external view returns (AuthAddress[] memory) {
+        bool hasTag = _terminusDID.hasTag(_rootDomain, domain, _authAddressesTagName);
+        if (!hasTag) {
+            revert RootTagNoExists(domain, _authAddressesTagName);
+        }
+
+        uint256[] memory elemPath;
+        bytes memory gotData = _terminusDID.getTagElem(_rootDomain, domain, _authAddressesTagName, elemPath);
+        return abi.decode(gotData, (AuthAddress[]));
+    }
+
+    function _authAddressCommonCheck(
+        AuthAddressReq calldata authAddressReq,
+        bytes calldata sigFromDomainOwnerPrivKey,
+        Action action
+    ) internal view {
+        // only support ethereum signature algorithm ECDSA so far
+        if (authAddressReq.algorithm != SigAlg.ECDSA) {
+            revert UnsupportedSigAlgorithm();
+        }
+
+        // should be correct action (Add, Remove, Modify)
+        if (authAddressReq.action != action) {
+            revert InvalidAction();
+        }
+
+        // signature expired
+        if (
+            !(block.timestamp >= authAddressReq.signAt && block.timestamp <= authAddressReq.signAt + VALID_SIG_INTERVAL)
+        ) {
+            revert SignatureIsValidOnlyInOneHour(authAddressReq.signAt, block.timestamp);
+        }
+
+        // signature check for domain owner
+        address domainOwner = recoverSigner(authAddressReq, sigFromDomainOwnerPrivKey);
+        if (domainOwner != _terminusDID.ownerOf(authAddressReq.domain.tokenId())) {
+            revert Unauthorized();
+        }
+    }
+
+    // latestDID is a string type tag
+    function setLatestDID(string calldata domain, string calldata latestDID) external authorizationCheck(domain) {
+        bool hasTag = _terminusDID.hasTag(_rootDomain, domain, _latestDIDTagName);
+        // remove latestDID
+        if (bytes(latestDID).length == 0) {
+            if (!hasTag) {
+                revert RootTagNoExists(domain, _latestDIDTagName);
+            }
+            return _terminusDID.removeTag(_rootDomain, domain, _latestDIDTagName);
+        }
+
+        // update latestDID
+        if (hasTag) {
+            uint256[] memory elemPath;
+            _terminusDID.updateTagElem(_rootDomain, domain, _latestDIDTagName, elemPath, abi.encode(latestDID));
+        } else {
+            // add dnsARecord
+            _terminusDID.addTag(_rootDomain, domain, _latestDIDTagName, abi.encode(latestDID));
+        }
+    }
+
+    function getLatestDID(string calldata domain) external view returns (string memory) {
+        if (!_terminusDID.hasTag(_rootDomain, domain, _latestDIDTagName)) {
+            revert RootTagNoExists(domain, _latestDIDTagName);
+        }
+        uint256[] memory elemPath;
+        bytes memory gotData = _terminusDID.getTagElem(_rootDomain, domain, _latestDIDTagName, elemPath);
+        return abi.decode(gotData, (string));
+    }
 }
