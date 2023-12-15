@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.21;
 
-import {ABI} from "../utils/ABI.sol";
+import {ABI} from "../utils/external/ABI.sol";
 import {Tag} from "../utils/Tag.sol";
 import {DomainUtils} from "../utils/DomainUtils.sol";
 import {OffchainValues} from "../utils/OffchainValues.sol";

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.21;
 
-import {ABI} from "./ABI.sol";
+import {ABI} from "./external/ABI.sol";
 
 library Tag {
     struct Group {
