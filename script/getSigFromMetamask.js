@@ -75,7 +75,7 @@ const start = async () => {
         domain: {
             name: 'DID',
             version: '1',
-            chainId: 420,
+            chainId: 11155420,
             verifyingContract: rootResolverAddr
         },
         message: {

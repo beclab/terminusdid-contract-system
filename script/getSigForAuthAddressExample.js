@@ -14,13 +14,13 @@ async function main() {
     console.log("Wallet account:", deployer.address);
     console.log("Account balance:", (await deployer.getBalance()).toString());
     
-    const rootResolverAddr = config.addresses.rootResolver;
+    const rootTaggerAddr = config.addresses.rootTagger;
     
     const domain = {
         name: 'DID',
         version: '1',
-        chainId: 420,
-        verifyingContract: rootResolverAddr
+        chainId: 11155420,
+        verifyingContract: rootTaggerAddr
     };
 
     const types = {

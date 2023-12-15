@@ -38,8 +38,13 @@ module.exports = {
             gas: 15000000,
             accounts: [PRIVATE_KEY]
         },
-        op_goerli: {
-            url: `https://optimism-goerli.publicnode.com`,
+        op_sepolia: {
+            url: `https://sepolia.optimism.io`,
+            gas: 15000000,
+            accounts: [PRIVATE_KEY]
+        },
+        op: {
+            url: `https://mainnet.optimism.io`,
             gas: 15000000,
             accounts: [PRIVATE_KEY]
         }
@@ -64,6 +69,6 @@ module.exports = {
         }),
     },
     addresses: {
-        rootResolver: "0x17e4C64d6417bc39393a8153853Bfa126347d0Cb",
+        rootTagger: "0xaA5bE49799b6A71Eda74d22D01F7A808aFf41b3f",
     }
 };

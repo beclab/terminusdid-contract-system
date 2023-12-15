@@ -116,6 +116,11 @@ contract TerminusDID is
         return _getStorage().metadata[tokenId];
     }
 
+    function getMetadata(string calldata domain) public view returns (Metadata memory) {
+        __ERC721_requireOwned(domain.tokenId());
+        return _getStorage().metadata[domain.tokenId()];
+    }
+
     /**
      * @notice Traces all levels of a domain and checks if an address is the owner of any level.
      *
