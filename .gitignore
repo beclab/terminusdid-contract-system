@@ -24,3 +24,5 @@ node_modules
 artifacts
 cache_hardhat
 
+# wallet
+wallets
