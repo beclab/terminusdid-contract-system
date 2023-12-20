@@ -3,8 +3,8 @@ const { ethers } = require("hardhat");
 const fetch = require("node-fetch");
 const keythereum = require("keythereum");
 
-const botKeyStore = require("../wallets/BotKeyStore.json");
-const terminusDIDAbiJson = require("../out/TerminusDID.sol/TerminusDID.json")
+const botKeyStore = require("../../wallets/BotKeyStore.json");
+const terminusDIDAbiJson = require("../../out/TerminusDID.sol/TerminusDID.json")
 
 let terminusDIDProxy;
 

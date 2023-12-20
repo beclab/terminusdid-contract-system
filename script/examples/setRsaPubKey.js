@@ -1,12 +1,12 @@
-const { ethers } = require("hardhat");
-const config = require("../hardhat.config");
+const { ethers, network } = require("hardhat");
+const config = require("../../hardhat.config");
 
 async function main() {
     const [deployer] = await ethers.getSigners();
     console.log("Wallet account:", deployer.address);
     console.log("Account balance:", (await deployer.getBalance()).toString());
 
-    const rootTaggerAddr = config.addresses.rootTagger;
+    const rootTaggerAddr = config.addresses[network.name].rootTagger;
     const rootTagger = await ethers.getContractAt("RootTagger", rootTaggerAddr, deployer);
 
     let tx;

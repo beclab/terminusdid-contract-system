@@ -69,6 +69,9 @@ module.exports = {
         }),
     },
     addresses: {
-        rootTagger: "0xaA5bE49799b6A71Eda74d22D01F7A808aFf41b3f",
+        op_sepolia: {
+            rootTagger: "0xaA5bE49799b6A71Eda74d22D01F7A808aFf41b3f",
+            terminusDIDProxy: "0x4c8c98e652d6a01494971a8faF5d3b68338f9ED4"
+        }
     }
 };

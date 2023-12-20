@@ -1,7 +1,7 @@
 require("hardhat");
 const { MetaMaskSDK } = require('@metamask/sdk');
 const qrcode = require('qrcode-terminal');
-const config = require("../hardhat.config");
+const config = require("../../hardhat.config");
 const SignatureAlogorithm = {
     ECDSA: 0,
 };
@@ -53,7 +53,7 @@ const start = async () => {
     const ethereum = sdk.getProvider();
     console.log(`selected address: ${ethereum.selectedAddress}`);
 
-    const rootResolverAddr = config.addresses.rootResolver;
+    const rootTaggerAddr = config.addresses.op_sepolia.rootResolver;
 
     const msgParams = {
         types: {
@@ -76,7 +76,7 @@ const start = async () => {
             name: 'DID',
             version: '1',
             chainId: 11155420,
-            verifyingContract: rootResolverAddr
+            verifyingContract: rootTaggerAddr
         },
         message: {
             addr: "0x40688b08ef03a5250706f6E120cb24Dfb5601B70",
