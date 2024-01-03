@@ -24,6 +24,7 @@ abstract contract TagRegistry {
         mapping(string domain => mapping(string name => TagType)) types;
         mapping(string from => mapping(string to => Tag.Group)) tags;
         OffchainValues.Register fieldNames;
+        mapping(string domain => string[] names) tagNames;
     }
 
     // keccak256(abi.encode(uint256(keccak256("terminus.TagRegistry")) - 1)) & ~bytes32(uint256(0xff))
@@ -153,6 +154,21 @@ abstract contract TagRegistry {
         return $.fieldNames.eventBlockNumber(hash);
     }
 
+    function getDefinedTagCount(string calldata domain) public view returns (uint256) {
+        __TagRegistry_Storage storage $ = __TagRegistry_getStorage();
+        return $.tagNames[domain].length;
+    }
+
+    function getDefinedTagNameByIndex(string calldata domain, uint256 index) public view returns (string memory) {
+        __TagRegistry_Storage storage $ = __TagRegistry_getStorage();
+        return $.tagNames[domain][index];
+    }
+
+    function getDefinedTagNames(string calldata domain) public view returns (string[] memory) {
+        __TagRegistry_Storage storage $ = __TagRegistry_getStorage();
+        return $.tagNames[domain];
+    }
+
     function defineTag(
         string calldata domain,
         string calldata name,
@@ -188,6 +204,8 @@ abstract contract TagRegistry {
 
         tagType.abiType = abiType;
         tagType.fieldNamesHash = fieldNamesHash;
+
+        $.tagNames[domain].push(name);
     }
 
     function _authorizeDefineTag(string calldata domain) internal virtual;
