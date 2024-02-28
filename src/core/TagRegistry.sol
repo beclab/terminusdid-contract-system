@@ -30,6 +30,18 @@ abstract contract TagRegistry {
     // keccak256(abi.encode(uint256(keccak256("terminus.TagRegistry")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant __TagRegistry_STORAGE = 0xc8ba1573a83064b637069eac29a25dd52440bc4f98f399766e0040c151cb1f00;
 
+    event NewTagType(string indexed domain, string indexed name, bytes abiType, bytes32[] fieldNamesHash);
+
+    event TagAdded(string indexed from, string indexed to, string indexed name, bytes value);
+
+    event TagRemoved(string indexed from, string indexed to, string indexed name);
+
+    event TagElemUpdated(string indexed from, string indexed to, string indexed name, uint256[] elemPath, bytes value);
+
+    event TagElemPushed(string indexed from, string indexed to, string indexed name, uint256[] elemPath, bytes value);
+
+    event TagElemPopped(string indexed from, string indexed to, string indexed name, uint256[] elemPath);
+
     error UndefinedTag(string domain, string name);
 
     error RedefinedTag(string domain, string name);
@@ -48,12 +60,14 @@ abstract contract TagRegistry {
             revert UndefinedTag(from, name);
         }
         $.tags[from][to].add(name).bind(abiType).set(value);
+        emit TagAdded(from, to, name, value);
     }
 
     function removeTag(string calldata from, string calldata to, string calldata name) public {
         _authorizeSetTag(from, to, name);
         __TagRegistry_Storage storage $ = __TagRegistry_getStorage();
         $.tags[from][to].remove(name);
+        emit TagRemoved(from, to, name);
     }
 
     function getTagElem(string calldata from, string calldata to, string calldata name, uint256[] calldata elemPath)
@@ -73,6 +87,8 @@ abstract contract TagRegistry {
     ) public {
         _authorizeSetTag(from, to, name);
         __TagRegistry_getReflectVar(from, to, name, elemPath).set(value);
+        uint256[] memory elemPath_ = elemPath;
+        emit TagElemUpdated(from, to, name, elemPath_, value);
     }
 
     function getTagElemLength(
@@ -93,6 +109,7 @@ abstract contract TagRegistry {
     ) public {
         _authorizeSetTag(from, to, name);
         __TagRegistry_getReflectVar(from, to, name, elemPath).push(value);
+        emit TagElemPushed(from, to, name, elemPath, value);
     }
 
     function popTagElem(string calldata from, string calldata to, string calldata name, uint256[] calldata elemPath)
@@ -100,6 +117,7 @@ abstract contract TagRegistry {
     {
         _authorizeSetTag(from, to, name);
         __TagRegistry_getReflectVar(from, to, name, elemPath).pop();
+        emit TagElemPopped(from, to, name, elemPath);
     }
 
     function getTagCount(string calldata from, string calldata to) public view returns (uint256) {
@@ -206,6 +224,7 @@ abstract contract TagRegistry {
         tagType.fieldNamesHash = fieldNamesHash;
 
         $.tagNames[domain].push(name);
+        emit NewTagType(domain, name, abiType, fieldNamesHash);
     }
 
     function _authorizeDefineTag(string calldata domain) internal virtual;
