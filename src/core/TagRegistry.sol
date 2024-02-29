@@ -30,17 +30,17 @@ abstract contract TagRegistry {
     // keccak256(abi.encode(uint256(keccak256("terminus.TagRegistry")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant __TagRegistry_STORAGE = 0xc8ba1573a83064b637069eac29a25dd52440bc4f98f399766e0040c151cb1f00;
 
-    event NewTagType(string indexed domain, string indexed name, bytes abiType, bytes32[] fieldNamesHash);
+    event NewTagType(string domain, string name, bytes abiType, bytes32[] fieldNamesHash);
 
-    event TagAdded(string indexed from, string indexed to, string indexed name, bytes value);
+    event TagAdded(string from, string to, string name, bytes value);
 
-    event TagRemoved(string indexed from, string indexed to, string indexed name);
+    event TagRemoved(string from, string to, string name);
 
-    event TagElemUpdated(string indexed from, string indexed to, string indexed name, uint256[] elemPath, bytes value);
+    event TagElemUpdated(string from, string to, string name, uint256[] elemPath, bytes value);
 
-    event TagElemPushed(string indexed from, string indexed to, string indexed name, uint256[] elemPath, bytes value);
+    event TagElemPushed(string from, string to, string name, uint256[] elemPath, bytes value);
 
-    event TagElemPopped(string indexed from, string indexed to, string indexed name, uint256[] elemPath);
+    event TagElemPopped(string from, string to, string name, uint256[] elemPath);
 
     error UndefinedTag(string domain, string name);
 
