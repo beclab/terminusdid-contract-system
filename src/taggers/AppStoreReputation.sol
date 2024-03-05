@@ -3,13 +3,14 @@ pragma solidity ^0.8.21;
 
 import {IERC5267} from "@openzeppelin/contracts/interfaces/IERC5267.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
+import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 import {TerminusDID} from "../core/TerminusDID.sol";
 
-contract AppStoreReputation is IERC5267, Nonces, IERC721Errors {
+contract AppStoreReputation is IERC5267, Nonces, Multicall, IERC721Errors {
     enum CommentReactionType {
         Cancel,
         Like,
@@ -65,7 +66,11 @@ contract AppStoreReputation is IERC5267, Nonces, IERC721Errors {
 
     error NonexistentAppOrVersion(string appId, string version);
 
+    error InvalidScore(uint8 score);
+
     error NonexistentComment(bytes32 commentId);
+
+    error RejectedComment(bytes32 commentId);
 
     constructor(address didRegistry_) {
         _didRegistry = TerminusDID(didRegistry_);
@@ -134,6 +139,10 @@ contract AppStoreReputation is IERC5267, Nonces, IERC721Errors {
         address signer = ECDSA.recover(_eip712Digest(structHash), v, r, s);
         if (owner != signer) {
             revert InvalidSigner(signer, owner);
+        }
+
+        if (score < 1 || score > 5) {
+            revert InvalidScore(score);
         }
 
         emit NewRating(appId, appVersion, reviewer, score);
@@ -213,6 +222,9 @@ contract AppStoreReputation is IERC5267, Nonces, IERC721Errors {
         }
 
         bytes32 commentId = getCommentId(appId, appVersion, reviewer, block.number);
+        if (_commentTokenIds[commentId] != 0) {
+            revert RejectedComment(commentId);
+        }
         _commentTokenIds[commentId] = tokenId;
 
         emit CommentAdded(appId, appVersion, reviewer, commentId, content);
