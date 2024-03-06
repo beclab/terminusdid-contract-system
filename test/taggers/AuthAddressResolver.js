@@ -20,11 +20,23 @@ describe('Auth address test', function () {
         const [deployer, ...signers] = await getSigners();
         const operator = deployer;
 
-        let TerminusDID = await getContractFactory('TerminusDID');
+        let ABI = await getContractFactory('src/utils/external/ABI.sol:ABI');
+        let abiLib = await ABI.deploy();
+
+        let TerminusDID = await getContractFactory('TerminusDID', {
+            libraries: {
+                ABI: abiLib.address,
+              },
+        });
         const name = "TerminusDID";
         const symbol = "TDID";
 
-        let terminusDIDProxy = await upgrades.deployProxy(TerminusDID, [name, symbol], { initializer: 'initialize', kind: 'uups', constructorArgs: [], unsafeAllow: ['state-variable-immutable'] })
+        let terminusDIDProxy = await upgrades.deployProxy(TerminusDID, [name, symbol], { 
+            initializer: 'initialize',
+            kind: 'uups', 
+            constructorArgs: [], 
+            unsafeAllow: ['state-variable-immutable', 'external-library-linking'] 
+        })
         await terminusDIDProxy.deployed();
 
         await terminusDIDProxy.setOperator(operator.address);
@@ -385,6 +397,31 @@ describe('Auth address test', function () {
         sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
         await expect(rootTagger.connect(operator).removeAuthenticationAddress(value, sigFromDomainOwner, 0)).to.be.revertedWithCustomError(rootTagger, "InvalidAction");
     });
+
+    it('use ECDSA lib to avoid ecrecover error for zero address', async function() {
+        const { rootTagger, terminusDIDProxy, operator, signers } = await loadFixture(deployTokenFixture);
+        const domainOwner = signers[0];
+        const authAddr = signers[1];
+        await terminusDIDProxy.connect(operator).register(domainOwner.address, { domain: "a", did: "did", notes: "", allowSubdomain: true })
+
+        const domain = await getDomain(domainOwner, rootTagger.address);
+        const types = getTypes();
+
+        let value = {
+            addr: AddressZero,
+            algorithm: SignatureAlogorithm.ECDSA,
+            domain: "a",
+            signAt: curTsInSeconds() - 30 * 60,
+            action: Action.Add
+        };
+
+        let sigFromDomainOwner = await domainOwner._signTypedData(domain, types, value);
+        let sigFromAuthAddr = await authAddr._signTypedData(domain, types, value);
+        let sigWrong = sigFromAuthAddr.substring(0, 130) + 'ff';
+
+        await expect(rootTagger.connect(operator).addAuthenticationAddress(value, sigWrong, sigFromDomainOwner))
+            .to.be.revertedWithCustomError(rootTagger, 'ECDSAInvalidSignature');
+    })
 });
 
 function curTsInSeconds() {
@@ -394,7 +431,7 @@ function curTsInSeconds() {
 async function getDomain(signer, contractAddr) {
     const chainId = await signer.getChainId();
     return {
-        name: 'DID',
+        name: 'Terminus DID Root Tagger',
         version: '1',
         chainId: chainId,
         verifyingContract: contractAddr
