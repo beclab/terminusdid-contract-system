@@ -11,11 +11,23 @@ describe('RsaPubKey test', function () {
         const [deployer] = await getSigners();
         const operator = deployer;
 
-        let TerminusDID = await getContractFactory('TerminusDID');
+        let ABI = await getContractFactory('src/utils/external/ABI.sol:ABI');
+        let abiLib = await ABI.deploy();
+
+        let TerminusDID = await getContractFactory('TerminusDID', {
+            libraries: {
+                ABI: abiLib.address,
+              },
+        });
         const name = "TerminusDID";
         const symbol = "TDID";
 
-        let terminusDIDProxy = await upgrades.deployProxy(TerminusDID, [name, symbol], { initializer: 'initialize', kind: 'uups', constructorArgs: [], unsafeAllow: ['state-variable-immutable'] })
+        let terminusDIDProxy = await upgrades.deployProxy(TerminusDID, [name, symbol], { 
+            initializer: 'initialize', 
+            kind: 'uups', 
+            constructorArgs: [], 
+            unsafeAllow: ['state-variable-immutable', 'external-library-linking'] 
+        });
         await terminusDIDProxy.deployed();
 
         await terminusDIDProxy.setOperator(operator.address);

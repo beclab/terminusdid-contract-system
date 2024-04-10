@@ -9,11 +9,25 @@ describe('TerminusDID test', function () {
 
     async function deployTokenFixture() {
         const [deployer] = await getSigners();
-        let TerminusDID = await getContractFactory('TerminusDID');
+
+        let ABI = await getContractFactory('src/utils/external/ABI.sol:ABI');
+        let abiLib = await ABI.deploy();
+
+        let TerminusDID = await getContractFactory('TerminusDID', {
+            libraries: {
+                ABI: abiLib.address,
+              },
+        });
+
         const name = "TestTerminusDID";
         const symbol = "TTDID";
 
-        terminusDIDProxy = await upgrades.deployProxy(TerminusDID, [name, symbol], { initializer: 'initialize', kind: 'uups', constructorArgs: [], unsafeAllow: ['state-variable-immutable'] })
+        terminusDIDProxy = await upgrades.deployProxy(TerminusDID, [name, symbol], { 
+            initializer: 'initialize', 
+            kind: 'uups', 
+            constructorArgs: [], 
+            unsafeAllow: ['state-variable-immutable', 'external-library-linking'] 
+        });
         await terminusDIDProxy.deployed();
 
         await terminusDIDProxy.setOperator(deployer.address);
@@ -41,7 +55,7 @@ describe('TerminusDID test', function () {
                 const receipt = await tx.wait();
                 const tokenId = receipt.events[0].args.tokenId;
 
-                const metadataRet = await terminusDIDProxy.getMetadata(tokenId);
+                const metadataRet = await terminusDIDProxy['getMetadata(uint256)'](tokenId);
 
                 expect(metadataRet.domain).to.equal(label);
             }

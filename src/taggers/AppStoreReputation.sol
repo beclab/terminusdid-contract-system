@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.21;
 
 import {IERC5267} from "@openzeppelin/contracts/interfaces/IERC5267.sol";

@@ -9,6 +9,9 @@ async function main() {
     let tx;
     let confirm;
 
+    let maxFeePerGas = ethers.BigNumber.from(1000000000) // default to 1 gwei
+    let maxPriorityFeePerGas = ethers.BigNumber.from(1000000000) // default to 1 gwei
+
     const terminusDIDProxyAddr = config.addresses[network.name].terminusDIDProxy;
     const terminusDIDProxy = await ethers.getContractAt("TerminusDID", terminusDIDProxyAddr, deployer);
 
@@ -26,6 +29,9 @@ async function main() {
             did: 'did',
             notes: 'testnet chain for AppStore Reputation contract',
             allowSubdomain: true
+        }, {
+            maxFeePerGas,
+            maxPriorityFeePerGas
         });
         console.log(`${tagsFrom} has been registered!`);
     } else {
@@ -33,7 +39,7 @@ async function main() {
     }
 
     /*
-        struct Rating {
+        struct · {
             string reviewer;
             uint8 score;
         }
@@ -42,16 +48,25 @@ async function main() {
     const ratingType = ethers.utils.arrayify('0x04060002030101');
     const fieldNames = new Array();
     fieldNames.push(['reviewer', 'score']);
-    tx = await terminusDIDProxy.connect(operator).defineTag(tagsFrom, tagName, ratingType, fieldNames);
+    tx = await terminusDIDProxy.connect(operator).defineTag(tagsFrom, tagName, ratingType, fieldNames, {
+        maxFeePerGas,
+        maxPriorityFeePerGas
+    });
     confirm = await tx.wait();
     console.log(`defined type Rating[]: ${confirm.transactionHash}`);
 
     const AppStoreReputation = await ethers.getContractFactory('AppStoreReputation');
-    const appStoreReputation = await AppStoreReputation.deploy(terminusDIDProxy.address);
+    const appStoreReputation = await AppStoreReputation.deploy(terminusDIDProxy.address, {
+        maxFeePerGas,
+        maxPriorityFeePerGas
+    });
     await appStoreReputation.deployed();
     console.log(`deployed AppStoreReputation: ${appStoreReputation.address}`);
-    
-    await terminusDIDProxy.connect(operator).setTagger(tagsFrom, tagName, appStoreReputation.address);
+
+    await terminusDIDProxy.connect(operator).setTagger(tagsFrom, tagName, appStoreReputation.address, {
+        maxFeePerGas,
+        maxPriorityFeePerGas
+    });
     console.log(`set tagger to AppStoreReputation`);
 }
 

@@ -73,7 +73,7 @@ const start = async () => {
         },
         primaryType: 'AuthAddressReq',
         domain: {
-            name: 'DID',
+            name: 'Terminus DID Root Tagger',
             version: '1',
             chainId: 11155420,
             verifyingContract: rootTaggerAddr

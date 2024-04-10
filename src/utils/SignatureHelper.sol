@@ -1,5 +1,7 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.21;
+
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 contract SignatureHelper {
     enum SigAlg {ECDSA}
@@ -26,7 +28,7 @@ contract SignatureHelper {
 
     constructor() {
         DOMAIN_SEPARATOR =
-            keccak256(abi.encode(EIP712DOMAIN_TYPEHASH, keccak256("DID"), keccak256("1"), getChainId(), this));
+            keccak256(abi.encode(EIP712DOMAIN_TYPEHASH, keccak256("Terminus DID Root Tagger"), keccak256("1"), getChainId(), this));
     }
 
     function recoverSigner(AuthAddressReq calldata authAddressReq, bytes calldata sig)
@@ -35,7 +37,7 @@ contract SignatureHelper {
         returns (address)
     {
         (bytes32 r, bytes32 s, uint8 v) = splitSignature(sig);
-        return ecrecover(getSigningMessage(authAddressReq), v, r, s);
+        return ECDSA.recover(getSigningMessage(authAddressReq), v, r, s);
     }
 
     function getSigningMessage(AuthAddressReq calldata authAddressReq) internal view returns (bytes32) {

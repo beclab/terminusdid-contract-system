@@ -88,8 +88,8 @@ module.exports = {
     addresses: {
         op_sepolia: {
             rootTagger: "0xaA5bE49799b6A71Eda74d22D01F7A808aFf41b3f",
-            terminusDIDProxy: "0x4c8c98e652d6a01494971a8faF5d3b68338f9ED4",
-            appStoreReputation: "0x7A6d69E42e0707df334C5983371C7546f030eF2b",
+            terminusDIDProxy: "0xe2D7c3a9013960E04d4E9F5F9B63fff37eEd97A8",
+            appStoreReputation: "0xD681657e88225366Def1ab8e7195D3b19314fD10",
         }
     }
 };

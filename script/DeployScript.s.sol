@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.21;
 
 import "forge-std/Script.sol";
@@ -73,7 +73,7 @@ contract DeployScript is Script {
 
         // register domain
         terminusDIDProxy.register(bot, TerminusDID.Metadata("com", "did", "", true));
-        terminusDIDProxy.register(bot, TerminusDID.Metadata("app.myterminus.com", "did", "", true));
+        terminusDIDProxy.register(bot, TerminusDID.Metadata("myterminus.com", "did", "", true));
 
         // transfer operator to bot
         terminusDIDProxy.setOperator(bot);

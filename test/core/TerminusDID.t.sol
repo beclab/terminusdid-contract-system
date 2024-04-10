@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.21;
 
 import {Test, Vm} from "forge-std/Test.sol";
@@ -969,7 +969,7 @@ contract TerminusDIDTest is Test {
         terminusDIDProxy.defineTag(rootDomain, tagName, aType, fieldNames);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
-        assertEq(entries.length, 2);
+        assertEq(entries.length, 3);
         assertEq(entries[0].topics[0], keccak256("OffchainStringArray(bytes32,string[])"));
         assertEq(entries[0].topics[1], keccak256(abi.encode(fieldNames[0])));
         assertEq(abi.decode(entries[0].data, (string[]))[0], "i");

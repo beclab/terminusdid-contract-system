@@ -19,7 +19,7 @@ async function main() {
     const rootTaggerAddr = config.addresses[network.name].rootTagger;
     
     const domain = {
-        name: 'DID',
+        name: 'Terminus DID Root Tagger',
         version: '1',
         chainId: chainId,
         verifyingContract: rootTaggerAddr
