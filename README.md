@@ -4,7 +4,7 @@
 
 The main contract in this repo is `TerminusDID`, defined a hierarchical DNS domain-like name system. We call it `Terminus Name (TName)`. 
 
-Anyone can register top Tname with metadata (domain, did, notes and allowSubdomain) and sepcify owner of it. For example, Bob is able to register TName `bob` if it is not registered yet. And Bob specified his own address `0x71...245F1` to be the owner of it. 
+Theoretically anyone (now can only be operator, a build-in role to maintain contract operation) can register top Tname with metadata (domain, did, notes and allowSubdomain) and sepcify owner of it. For example, Bob is able to register TName `bob` if it is not registered yet. And Bob specified his own address `0x71...245F1` to be the owner of it. 
 
 ```
 domain: "bob"
@@ -70,3 +70,18 @@ forge script script/DeployScript.s.sol:DeployScript --rpc-url $OP_RPC_URL --broa
 # deploy AppStoreReputation contract
 npx hardhat run script/AppStoreReputation/deployAppStoreReputaton.js --network op_sepolia
 ```
+
+## Release History
+
+- [v2.3.1: replace ecrecover with OZ ECDSA lib](https://github.com/Above-Os/did-contracts/releases/tag/v2.3.1)
+
+- [v2.3.0: create tag type system](https://github.com/Above-Os/did-contracts/releases/tag/v2.3)
+
+- [v2.2.0: add upgradeability to terminusDid](https://github.com/Above-Os/did-contracts/releases/tag/v2.2)
+
+- [v2.1.0: implement TerminusDID contract v2.1.0](https://github.com/Above-Os/did-contracts/releases/tag/v2.1) 
+
+
+## Contract
+
+- [TerminusOS X](https://twitter.com/TerminusOS)
