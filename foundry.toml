@@ -16,7 +16,7 @@ op = "${OP_RPC_URL}"
 goerli = "${GOERLI_RPC_URL}"
 
 [etherscan]
-op = { key = "${OP_API_KEY}", chain = 11155420 }
+op = { key = "${OP_API_KEY}", chain = 10 }
 goerli = { key = "${API_KEY}" }
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

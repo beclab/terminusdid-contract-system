@@ -10,7 +10,7 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 
 import {TerminusDID} from "../core/TerminusDID.sol";
 
-contract AppStoreReputation is IERC5267, Nonces, Multicall, IERC721Errors {
+contract TerminusAppMarketReputation is IERC5267, Nonces, Multicall, IERC721Errors {
     enum CommentReactionType {
         Cancel,
         Like,
@@ -22,7 +22,7 @@ contract AppStoreReputation is IERC5267, Nonces, Multicall, IERC721Errors {
         uint8 score;
     }
 
-    string private constant NAME = "Terminus App Store Reputation";
+    string private constant NAME = "Terminus App Market Reputation";
     string private constant VERSION = "1";
 
     bytes32 private constant RATING_TYPEHASH =
@@ -74,7 +74,7 @@ contract AppStoreReputation is IERC5267, Nonces, Multicall, IERC721Errors {
 
     constructor(address didRegistry_) {
         _didRegistry = TerminusDID(didRegistry_);
-        require(_didRegistry.isRegistered(TAGS_FROM), "AppStoreReputation: TAGS_FROM not registered yet");
+        require(_didRegistry.isRegistered(TAGS_FROM), "TerminusAppMarketReputation: TAGS_FROM not registered yet");
 
         _chainId = block.chainid;
         _thisAddress = address(this);

@@ -27,6 +27,7 @@ module.exports = {
                         runs: 200,
                     },
                     viaIR: true,
+                    evmVersion: "paris",
                 },
             }
         ],
@@ -46,7 +47,7 @@ module.exports = {
             accounts: [PRIVATE_KEY, REVIEWER_PRIVATE_KEY]
         },
         op: {
-            url: `https://mainnet.optimism.io`,
+            url: `https://optimism.llamarpc.com`,
             gas: 15000000,
             accounts: [PRIVATE_KEY]
         }
@@ -72,7 +73,8 @@ module.exports = {
     },
     etherscan: {
         apiKey: {
-            op_sepolia: OP_API_KEY
+            op_sepolia: OP_API_KEY,
+            optimisticEthereum: OP_API_KEY,
         },
         customChains: [
             {
@@ -89,7 +91,12 @@ module.exports = {
         op_sepolia: {
             rootTagger: "0xaA5bE49799b6A71Eda74d22D01F7A808aFf41b3f",
             terminusDIDProxy: "0xe2D7c3a9013960E04d4E9F5F9B63fff37eEd97A8",
-            appStoreReputation: "0xD681657e88225366Def1ab8e7195D3b19314fD10",
+            appMarketReputation: "0xD681657e88225366Def1ab8e7195D3b19314fD10",
+        },
+        op: {
+            rootTagger: "0xE2EABA0979277A90511F8873ae1e8cA26B54E740",
+            terminusDIDProxy: "0x5DA4Fa8E567d86e52Ef8Da860de1be8f54cae97D",
+            appMarketReputation: "0x08065353D266121938B93D4B1071Bb52CD0C0EE4",
         }
     }
 };

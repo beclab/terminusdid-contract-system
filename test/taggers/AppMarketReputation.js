@@ -11,7 +11,7 @@ const CommentReactionType = {
     Dislike: 2
 };
 
-describe('AppStore Reputation Test', function () {
+describe('AppMarket Reputation Test', function () {
     async function deployTokenFixture() {
         const [deployer, ...signers] = await getSigners();
         const operator = deployer;
@@ -83,19 +83,19 @@ describe('AppStore Reputation Test', function () {
         fieldNames.push(['reviewer', 'score']);
         await terminusDIDProxy.connect(operator).defineTag(tagsFrom, tagName, ratingType, fieldNames);
 
-        const AppStoreReputation = await getContractFactory('AppStoreReputation');
-        const appStoreReputation = await AppStoreReputation.deploy(terminusDIDProxy.address);
-        await appStoreReputation.deployed();
+        const TerminusAppMarketReputation = await getContractFactory('TerminusAppMarketReputation');
+        const appMarketReputation = await TerminusAppMarketReputation.deploy(terminusDIDProxy.address);
+        await appMarketReputation.deployed();
         
-        await terminusDIDProxy.connect(operator).setTagger(tagsFrom, tagName, appStoreReputation.address);
+        await terminusDIDProxy.connect(operator).setTagger(tagsFrom, tagName, appMarketReputation.address);
 
-        return { appStoreReputation, terminusDIDProxy, operator, signers };
+        return { appMarketReputation, terminusDIDProxy, operator, signers };
     }
 
 
     it('submitRating test', async function () {
-        const { appStoreReputation, terminusDIDProxy, operator, signers } = await loadFixture(deployTokenFixture);
-        expect(terminusDIDProxy.address).to.equal(await appStoreReputation.didRegistry());
+        const { appMarketReputation, terminusDIDProxy, operator, signers } = await loadFixture(deployTokenFixture);
+        expect(terminusDIDProxy.address).to.equal(await appMarketReputation.didRegistry());
         
         const domainOwner = signers[0];
         const reviewer = 'testUser.com';
@@ -107,7 +107,7 @@ describe('AppStore Reputation Test', function () {
             allowSubdomain: true
         })
 
-        const domain = await getDomain(domainOwner, appStoreReputation.address);
+        const domain = await getDomain(domainOwner, appMarketReputation.address);
 
         const types = getRatingTypes();
 
@@ -136,19 +136,19 @@ describe('AppStore Reputation Test', function () {
             appVersion,
             reviewer,
             score,
-            nonce: await appStoreReputation.nonces(domainOwner.address)
+            nonce: await appMarketReputation.nonces(domainOwner.address)
         };
 
         let sig = await domainOwner._signTypedData(domain, types, value);
 
         let {v, r, s} = getVRSfromSig(sig);
-        await expect(appStoreReputation.connect(operator).submitRating(appId, appVersion, reviewer, score, v, r, s))
-            .to.emit(appStoreReputation, 'NewRating')
+        await expect(appMarketReputation.connect(operator).submitRating(appId, appVersion, reviewer, score, v, r, s))
+            .to.emit(appMarketReputation, 'NewRating')
             .withArgs(appId, appVersion, reviewer, score);
 
         // replay attrack
-        await expect(appStoreReputation.connect(operator).submitRating(appId, appVersion, reviewer, score, v, r, s))
-            .to.be.revertedWithCustomError(appStoreReputation, 'InvalidSigner');
+        await expect(appMarketReputation.connect(operator).submitRating(appId, appVersion, reviewer, score, v, r, s))
+            .to.be.revertedWithCustomError(appMarketReputation, 'InvalidSigner');
 
         // update rating
         score = 5;
@@ -157,7 +157,7 @@ describe('AppStore Reputation Test', function () {
             appVersion,
             reviewer,
             score,
-            nonce: await appStoreReputation.nonces(domainOwner.address)
+            nonce: await appMarketReputation.nonces(domainOwner.address)
         };
 
         sig = await domainOwner._signTypedData(domain, types, value);
@@ -166,13 +166,13 @@ describe('AppStore Reputation Test', function () {
         r = ret.r;
         s = ret.s;
 
-        await expect(appStoreReputation.connect(operator).submitRating(appId, appVersion, reviewer, score, v, r, s))
-            .to.emit(appStoreReputation, 'NewRating')
+        await expect(appMarketReputation.connect(operator).submitRating(appId, appVersion, reviewer, score, v, r, s))
+            .to.emit(appMarketReputation, 'NewRating')
             .withArgs(appId, appVersion, reviewer, score);
     });
 
     it('addComment test | updateComment test | deleteComment test | submitCommentReaction test', async function () {
-        const { appStoreReputation, terminusDIDProxy, operator, signers } = await loadFixture(deployTokenFixture);
+        const { appMarketReputation, terminusDIDProxy, operator, signers } = await loadFixture(deployTokenFixture);
         
         // add comment test
         const domainOwner = signers[0];
@@ -185,7 +185,7 @@ describe('AppStore Reputation Test', function () {
             allowSubdomain: true
         })
 
-        const domain = await getDomain(domainOwner, appStoreReputation.address);
+        const domain = await getDomain(domainOwner, appMarketReputation.address);
 
         const types = getAddCommentTypes();
 
@@ -214,16 +214,16 @@ describe('AppStore Reputation Test', function () {
             appVersion,
             reviewer,
             content,
-            nonce: await appStoreReputation.nonces(domainOwner.address)
+            nonce: await appMarketReputation.nonces(domainOwner.address)
         };
 
         let sig;
         sig = getVRSfromSig(await domainOwner._signTypedData(domain, types, value));
         
-        const commentId = await appStoreReputation.getCommentId(appId, appVersion, reviewer, (await time.latestBlock()) + 1);
+        const commentId = await appMarketReputation.getCommentId(appId, appVersion, reviewer, (await time.latestBlock()) + 1);
         
-        await expect(appStoreReputation.connect(operator).addComment(appId, appVersion, reviewer, content, sig.v, sig.r, sig.s))
-            .to.emit(appStoreReputation, 'CommentAdded')
+        await expect(appMarketReputation.connect(operator).addComment(appId, appVersion, reviewer, content, sig.v, sig.r, sig.s))
+            .to.emit(appMarketReputation, 'CommentAdded')
             .withArgs(appId, appVersion, reviewer, commentId, content);
    
         // update comment test
@@ -232,11 +232,11 @@ describe('AppStore Reputation Test', function () {
         const updateCommentValue = {
             commentId,
             content: contentUpdate,
-            nonce: await appStoreReputation.nonces(domainOwner.address)
+            nonce: await appMarketReputation.nonces(domainOwner.address)
         }
         sig = getVRSfromSig(await domainOwner._signTypedData(domain, updateCommentType, updateCommentValue));
-        await expect(appStoreReputation.connect(operator).updateComment(commentId, contentUpdate, sig.v, sig.r, sig.s))
-            .to.emit(appStoreReputation, 'CommentUpdated')
+        await expect(appMarketReputation.connect(operator).updateComment(commentId, contentUpdate, sig.v, sig.r, sig.s))
+            .to.emit(appMarketReputation, 'CommentUpdated')
             .withArgs(commentId, contentUpdate);
 
         // submit comment reaction
@@ -253,22 +253,22 @@ describe('AppStore Reputation Test', function () {
             user: reactionUserName,
             commentId,
             reactionType: CommentReactionType.Like,
-            nonce: await appStoreReputation.nonces(reactionUser.address)
+            nonce: await appMarketReputation.nonces(reactionUser.address)
         }
         sig = getVRSfromSig(await reactionUser._signTypedData(domain, commentReactionType, commentReactionValue));
-        await expect(appStoreReputation.connect(operator).submitCommentReaction(reactionUserName, commentId, CommentReactionType.Like, sig.v, sig.r, sig.s))
-            .to.emit(appStoreReputation, 'NewCommentReaction')
+        await expect(appMarketReputation.connect(operator).submitCommentReaction(reactionUserName, commentId, CommentReactionType.Like, sig.v, sig.r, sig.s))
+            .to.emit(appMarketReputation, 'NewCommentReaction')
             .withArgs(reactionUserName, commentId, CommentReactionType.Like);
 
         // delete comment test
         const deleteCommentType = getDeleteCommentTypes();
         const deleteCommentValue = {
             commentId,
-            nonce: await appStoreReputation.nonces(domainOwner.address)
+            nonce: await appMarketReputation.nonces(domainOwner.address)
         }
         sig = getVRSfromSig(await domainOwner._signTypedData(domain, deleteCommentType, deleteCommentValue));
-        await expect(appStoreReputation.connect(operator).deleteComment(commentId, sig.v, sig.r, sig.s))
-            .to.emit(appStoreReputation, 'CommentDeleted')
+        await expect(appMarketReputation.connect(operator).deleteComment(commentId, sig.v, sig.r, sig.s))
+            .to.emit(appMarketReputation, 'CommentDeleted')
             .withArgs(commentId);
     });
 });
@@ -276,7 +276,7 @@ describe('AppStore Reputation Test', function () {
 async function getDomain(signer, contractAddr) {
     const chainId = await signer.getChainId();
     return {
-        name: 'Terminus App Store Reputation',
+        name: 'Terminus App Market Reputation',
         version: '1',
         chainId: chainId,
         verifyingContract: contractAddr

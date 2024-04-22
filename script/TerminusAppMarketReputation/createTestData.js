@@ -22,14 +22,11 @@ async function main() {
     let sig;
     let types;
 
-    let maxFeePerGas = ethers.BigNumber.from(1000000000) // default to 1 gwei
-    let maxPriorityFeePerGas = ethers.BigNumber.from(1000000000) // default to 1 gwei
-
     const terminusDIDProxyAddr = config.addresses[network.name].terminusDIDProxy;
     const terminusDIDProxy = await ethers.getContractAt('TerminusDID', terminusDIDProxyAddr, manager);
 
-    const appStoreReputationAddr = config.addresses[network.name].appStoreReputation;
-    const appStoreReputation = await ethers.getContractAt('AppStoreReputation', appStoreReputationAddr, manager);
+    const appMarketReputationAddr = config.addresses[network.name].appMarketReputation;
+    const appMarketReputation = await ethers.getContractAt('TerminusAppMarketReputation', appMarketReputationAddr, manager);
 
     const tagsFrom = 'app.myterminus.com';
 
@@ -66,7 +63,7 @@ async function main() {
     let reviewerName = 'song.net';
     let reviewerOwner = '0x945e9704D2735b420363071bB935ACf2B9C4b814';
 
-    const domain = await getDomain(reviewer, appStoreReputation.address);
+    const domain = await getDomain(reviewer, appMarketReputation.address);
     types = getRatingTypes();
     const score = 5;
 
@@ -75,16 +72,13 @@ async function main() {
         appVersion,
         reviewer: reviewerName,
         score,
-        nonce: await appStoreReputation.nonces(reviewerOwner)
+        nonce: await appMarketReputation.nonces(reviewerOwner)
     };
 
     sig = await reviewer._signTypedData(domain, types, value);
     let {v, r, s} = getVRSfromSig(sig);
 
-    tx = await appStoreReputation.connect(manager).submitRating(appId, appVersion, reviewerName, score, v, r, s, {
-        maxFeePerGas,
-        maxPriorityFeePerGas
-    });
+    tx = await appMarketReputation.connect(manager).submitRating(appId, appVersion, reviewerName, score, v, r, s);
     confirm = await tx.wait();
     console.log(`submit a rating ${score} to ${appFullName} from ${reviewerName}: ${confirm.transactionHash}`);
 
@@ -97,14 +91,11 @@ async function main() {
         appVersion,
         reviewer: reviewerName,
         content,
-        nonce: await appStoreReputation.nonces(reviewerOwner)
+        nonce: await appMarketReputation.nonces(reviewerOwner)
     };
 
     sig = getVRSfromSig(await reviewer._signTypedData(domain, types, value));
-    tx = await appStoreReputation.connect(manager).addComment(appId, appVersion, reviewerName, content, sig.v, sig.r, sig.s, {
-        maxFeePerGas,
-        maxPriorityFeePerGas
-    });
+    tx = await appMarketReputation.connect(manager).addComment(appId, appVersion, reviewerName, content, sig.v, sig.r, sig.s);
     confirm = await tx.wait();
     console.log(`add a comment <${content}> to ${appFullName} from ${reviewerName}: ${confirm.transactionHash}`);
 
@@ -122,13 +113,10 @@ async function main() {
     value = {
         commentId,
         content: contentUpdate,
-        nonce: await appStoreReputation.nonces(reviewerOwner)
+        nonce: await appMarketReputation.nonces(reviewerOwner)
     }
     sig = getVRSfromSig(await reviewer._signTypedData(domain, types, value));
-    tx = await appStoreReputation.connect(manager).updateComment(commentId, contentUpdate, sig.v, sig.r, sig.s, {
-        maxFeePerGas,
-        maxPriorityFeePerGas
-    });
+    tx = await appMarketReputation.connect(manager).updateComment(commentId, contentUpdate, sig.v, sig.r, sig.s);
 
     confirm = await tx.wait();
     console.log(`update comment <${contentUpdate}> to comment ${commentId} of ${appFullName} from ${reviewerName}: ${confirm.transactionHash}`);
@@ -139,13 +127,10 @@ async function main() {
         user: reviewerName,
         commentId,
         reactionType: CommentReactionType.Like,
-        nonce: await appStoreReputation.nonces(reviewerOwner)
+        nonce: await appMarketReputation.nonces(reviewerOwner)
     }
     sig = getVRSfromSig(await reviewer._signTypedData(domain, types, value));
-    tx = await appStoreReputation.connect(manager).submitCommentReaction(reviewerName, commentId, CommentReactionType.Like, sig.v, sig.r, sig.s, {
-        maxFeePerGas,
-        maxPriorityFeePerGas
-    });
+    tx = await appMarketReputation.connect(manager).submitCommentReaction(reviewerName, commentId, CommentReactionType.Like, sig.v, sig.r, sig.s);
     confirm = await tx.wait();
     console.log(`add a comment reaction <${CommentReactionType.Like}> to comment ${commentId} of ${appFullName} from ${reviewerName}: ${confirm.transactionHash}`);
 
@@ -153,20 +138,17 @@ async function main() {
     types = getDeleteCommentTypes();
     value = {
         commentId,
-        nonce: await appStoreReputation.nonces(reviewerOwner)
+        nonce: await appMarketReputation.nonces(reviewerOwner)
     }
     sig = getVRSfromSig(await reviewer._signTypedData(domain, types, value));
-    tx = await appStoreReputation.connect(manager).deleteComment(commentId, sig.v, sig.r, sig.s, {
-        maxFeePerGas,
-        maxPriorityFeePerGas
-    });
+    tx = await appMarketReputation.connect(manager).deleteComment(commentId, sig.v, sig.r, sig.s);
     console.log(`delete comment ${commentId} of ${appFullName} from ${reviewerName}: ${confirm.transactionHash}`);
 }
 
 async function getDomain(signer, contractAddr) {
     const chainId = await signer.getChainId();
     return {
-        name: 'Terminus App Store Reputation',
+        name: 'Terminus App Market Reputation',
         version: '1',
         chainId: chainId,
         verifyingContract: contractAddr

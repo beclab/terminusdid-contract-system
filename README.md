@@ -19,7 +19,7 @@ The TName `myterminus.com` is registered by us when the contract is deployed.
 
 Besides the metadata, the `TerminusDID` provides an extensible attribution attached to TName called `Tag`. We introduced a type system to `Tag`, which means not only the `Tag` has name, but also has type. Currently it supports all primitive solidity type (int, uint, bool, string, address, bytes, bytesN ) and array, arrayN, tuple. For example, Bob can define a tag with name `height` and type `uint256` to extend his metadata of TName `bob`. And Bob (and only the Bob can) then need to specify a Tagger address to set the `height` tag. only the Tagger address is able to set the `height` tag. The Tagger can be an EOA address or a contract address. If it is a contract address, Bob can put complicated data validation logic in it. The Tagger then can set (add, update, delete) `height` tag of Bob's TName and all his sub-TNames.
 
-The `TerminusDID` predefined some root tags (rsaPubKey, dnsARecord, authAddresses and latestDID) to root TName, which is empty string `""`, and specify a root tagger. Any TName can set root tags from root tagger. And also an appstore reputation tag is defined at TName `app.myterminus.com`. For more info, you can checkout src/taggers.
+The `TerminusDID` predefined some root tags (rsaPubKey, dnsARecord, authAddresses and latestDID) to root TName, which is empty string `""`, and specify a root tagger. Any TName can set root tags from root tagger. And also a `ratings` tag is defined at TName `app.myterminus.com`. For more info, you can checkout src/taggers.
 
 ## Usage
 
@@ -67,8 +67,8 @@ deploy to op sepolia as example
 source .env
 forge script script/DeployScript.s.sol:DeployScript --rpc-url $OP_RPC_URL --broadcast --slow -vvvv
 
-# deploy AppStoreReputation contract
-npx hardhat run script/AppStoreReputation/deployAppStoreReputaton.js --network op_sepolia
+# deploy TerminusAppMarketReputation contract
+npx hardhat run script/TerminusAppMarketReputation/deploy.js --network op_sepolia
 ```
 
 ## Release History

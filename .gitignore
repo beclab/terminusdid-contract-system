@@ -26,3 +26,6 @@ cache_hardhat
 
 # wallet
 wallets
+
+# migration source data
+script/migration/*.json
