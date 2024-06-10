@@ -82,6 +82,6 @@ npx hardhat run script/TerminusAppMarketReputation/deploy.js --network op_sepoli
 - [v2.1.0: implement TerminusDID contract v2.1.0](https://github.com/Above-Os/did-contracts/releases/tag/v2.1) 
 
 
-## Contract
+## Contact
 
 - [TerminusOS X](https://twitter.com/TerminusOS)
